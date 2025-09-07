@@ -1,4 +1,4 @@
-import { GEMINI_API_KEY } from '@env';
+import { GEMINI_API_KEY } from '.env';
 
 export const generatePlayerAnalysis = async (playerData) => {
     playerData.league = undefined;

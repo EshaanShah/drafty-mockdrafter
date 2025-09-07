@@ -2,8 +2,8 @@ import './globals.css';
 import {Text} from "react-native";
 import { Stack } from "expo-router";
 import {useFonts} from 'expo-font';
+import { RosterProvider } from "@/contexts/RosterContext";
 import {useEffect} from 'react';
-
 
 export default function RootLayout() {
   const [fontsLoaded] = useFonts({
@@ -21,5 +21,13 @@ export default function RootLayout() {
     return <Text>Loading...</Text>;
   }
 
-  return <Stack screenOptions={{headerShown: false}}/>;
+  return (
+      <RosterProvider>
+        <Stack screenOptions={{headerShown: false}}>
+          <Stack.Screen name="index" />
+          <Stack.Screen name="setupScreen" />
+          <Stack.Screen name="(draftTabs)" options={{ headerShown: false }} />
+        </Stack>
+      </RosterProvider>
+  );
 }
