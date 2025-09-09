@@ -78,7 +78,7 @@ const SectionHeader = ({ title, count, maxCount }) => (
 );
 
 export default function Roster() {
-    const { roster } = useContext(RosterContext);
+    const { roster } = useContext(RosterContext)!;
     const [currentView, setCurrentView] = useState('roster'); // 'roster' or 'draft'
 
     // Calculate starter count

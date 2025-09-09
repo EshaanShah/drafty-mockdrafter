@@ -1,17 +1,51 @@
-import React, {useEffect, useState} from 'react';
+import React, {useContext, useEffect, useState} from 'react';
 import {View, Text, TouchableOpacity, Image, ScrollView, Alert} from 'react-native';
 import {router, useLocalSearchParams} from 'expo-router';
 import {images} from "@/constants";
-import { useRoster } from '@/contexts/RosterContext'; // Import the roster context
-
+import {RosterContext, useRoster} from '@/contexts/RosterContext'; // Import the roster context
+import { generatePlayerAnalysis } from '@/services/aiService'; // Import your API function
 
 
 export default function PlayerScreen() {
     const { name, position, team } = useLocalSearchParams();
+    const { roster } = useContext(RosterContext)!;
     const [reachStatus, setStatus] = useState('reach');
+    const [aiAnalysis, setAiAnalysis] = useState('Loading AI analysis...'); // New state for AI analysis
 
     // Get roster functions
     const { addPlayer, isPlayerDrafted } = useRoster();
+
+    // Generate AI analysis when component mounts
+    useEffect(() => {
+        const getAIAnalysis = async () => {
+            const playerData = {
+                name: name as string,
+                position: position as string,
+                team: team as string,
+                round: 5, // You'll need to get this from somewhere
+                pick: 67, // You'll need to get this from somewhere
+                league: "12-team PPR" // You'll need to get this from somewhere
+            };
+
+            try {
+                const analysis = await generatePlayerAnalysis(playerData, roster);
+                setAiAnalysis(analysis);
+
+                // You can also set the reach status based on the analysis
+                if (analysis.includes("Good Value")) {
+                    setStatus('goodValue');
+                } else if (analysis.includes("Fair Value")) {
+                    setStatus('fairValue');
+                } else {
+                    setStatus('reach');
+                }
+            } catch (error) {
+                setAiAnalysis("Unable to generate analysis. Please try again later.");
+            }
+        };
+
+        getAIAnalysis();
+    }, [name, position, team, roster]); // Re-run if any of these change
 
     // Check if this player is already drafted
     const isDrafted = isPlayerDrafted(name as string); // Using name as ID for simplicity
@@ -20,7 +54,7 @@ export default function PlayerScreen() {
     const handleDraft = (e: any) => {
         e.stopPropagation(); // Prevent the card navigation when pressing draft
 
-        // Create player object
+
         const player = {
             id: name, // Using name as ID (you might want to use a real ID later)
             name: name,
@@ -28,7 +62,6 @@ export default function PlayerScreen() {
             team: team
         };
 
-        // Try to add player to roster
         const result = addPlayer(player);
 
         if (result.success) {
@@ -139,7 +172,7 @@ export default function PlayerScreen() {
                             <Text className=" ml-2 font-pingfang-bold text-xl ">AI Expert Summary</Text>
                         </View>
                         <Text className= 'p-4 font-pingfang'>
-                            With Rodgers’ ADP sitting around 183 and a QB28 projection, selecting him at 8.08 is a massive reach. Your roster has two top-tier receivers and an elite running back, so the priority should be filling your QB slot with a better value. In a 12-team league, waiting on a quarterback is a common strategy, and a pick in the eighth round should land you a higher-upside QB like Justin Herbert or Jordan Love. Rodgers' 2024 PPG (15.1, QB15) and his age/injury history (41 years old, dealt with a nagging knee issue last season) make him a risky pick with little upside.
+                            {aiAnalysis}
                         </Text>
                     </View>
 
@@ -148,9 +181,6 @@ export default function PlayerScreen() {
                 <View className ={`flex-1 justify-center rounded-xl items-center mt-8 mx-10 w-96 p-4 ${reachStatus === 'reach' ? 'bg-red-300 text-white' : reachStatus === 'goodValue' ? 'bg-green-500 text-white'  : 'bg-white text-black'}  `}  >
                     <Text className="text-lg font-pingfang-bold">Reach pick based on your roster, league settings, and who's on the board  </Text>
                 </View>
-                <TouchableOpacity className="items-center justify-center mx-10 mb-7 w-96 mt-6 border-light p-6 border-2">
-                    <Text className = "font-pingfang-bold">DRAFT</Text>
-                </TouchableOpacity>
                 <TouchableOpacity
                     className={`items-center justify-center mx-10 mb-7 w-96 mt-6 border-light p-6 border-2 ${
                         isDrafted

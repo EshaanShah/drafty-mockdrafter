@@ -43,7 +43,7 @@ const PlayerCard: React.FC<PlayerCardProps> = ({ PlayerName, PlayerPosition, Pla
             className={`mx-2 my-1 rounded-lg ${isDrafted ? 'bg-gray-200' : 'bg-white'}`} // Gray out if drafted
             onPress={() =>
                 router.push({
-                    pathname: "/(draftTabs)/[name]",   // ✅ points to app/[name].tsx
+                    pathname: "/(draftTabs)/[name]",
                     params: {
                         name: PlayerName,
                         position: PlayerPosition,
