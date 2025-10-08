@@ -13,11 +13,14 @@ import {
 import {images} from "@/constants";
 import PlayerCard from "@/components/PlayerCard";
 import adp from "../../adp_halfPPR.json";
+import { useDraft } from '@/contexts/DraftContext';
 import adpPPR from "../../adp_fullPPR.json";
+
 const players = adp.body.adpList;
 
 
 const DraftScreen = () => {
+    const { round, pick, timeLeft, setPick } = useDraft();
     return (
         <View className="flex-1 bg-white">
             {/* Header Section */}
@@ -28,7 +31,7 @@ const DraftScreen = () => {
                         className="w-15 h-15 mr-8 mt-10 ml-0"
                     />
                     <Text className="text-white text-lg font-pingfang-bold">
-                        Round 2 – Pick 3
+                        Round: {round} Pick: {pick}
                     </Text>
                 </View>
                 <View className="flex-row items-center">

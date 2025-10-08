@@ -35,12 +35,12 @@ const PositionBadge = ({ position, variant = "default" }) => {
 const PlayerCard = ({ player, position, isEmpty = false }) => {
     if (isEmpty || !player) {
         return (
-            <TouchableOpacity className="flex-row items-center bg-gray-100 p-3 mb-2 rounded-lg border border-gray-200">
+            <View className="flex-row items-center bg-gray-100 p-3 mb-2 rounded-lg border border-gray-200">
                 <PositionBadge position={position} />
                 <View className="ml-3 flex-1">
                     <Text className="text-gray-400 font-pingfang">Empty Slot</Text>
                 </View>
-            </TouchableOpacity>
+            </View>
         );
     }
 

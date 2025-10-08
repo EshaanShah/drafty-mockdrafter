@@ -2,7 +2,7 @@ import React from 'react';
 import { View, Text, ScrollView, TouchableOpacity, Image, Alert } from 'react-native';
 import { useRouter } from 'expo-router';   // ✅ use the hook
 import { useRoster } from '@/contexts/RosterContext'; // Import the roster context
-
+import {useDraft} from '@/contexts/DraftContext'
 interface PlayerCardProps {
     PlayerName: string;
     PlayerPosition: string;
@@ -12,6 +12,7 @@ interface PlayerCardProps {
 const PlayerCard: React.FC<PlayerCardProps> = ({ PlayerName, PlayerPosition, PlayerTeam }) => {
     const router = useRouter();
     const { addPlayer, isPlayerDrafted } = useRoster();
+    const draft =useDraft();
 
     // Check if this player is already drafted
     const isDrafted = isPlayerDrafted(PlayerName); // Using name as ID for simplicity
@@ -32,7 +33,9 @@ const PlayerCard: React.FC<PlayerCardProps> = ({ PlayerName, PlayerPosition, Pla
         const result = addPlayer(player);
 
         if (result.success) {
+
             Alert.alert('Success!', `${PlayerName} has been drafted!`);
+
         } else {
             Alert.alert('Cannot Draft', result.message || 'Unable to draft player');
         }

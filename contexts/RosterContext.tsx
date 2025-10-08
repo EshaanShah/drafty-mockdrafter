@@ -15,7 +15,10 @@ export type Roster = {
     qb: Player | null;
     rb: Player[];   // max 2
     wr: Player[];   // max 2
+    te: Player | null;   // ✅ ADDED
     flex: Player | null; // accepts RB/WR/TE (max 1)
+    dst: Player | null;  // ✅ ADDED
+    k: Player | null;    // ✅ ADDED
     bench: Player[]; // max 4
 };
 
@@ -29,14 +32,17 @@ type RosterContextType = {
     addPlayer: (player: Player) => AddResult;
     removePlayer: (playerId: string) => boolean;
     isPlayerDrafted: (playerId: string) => boolean;
-    getRosterStatus: () => { qb: number; rb: number; wr: number; flex: number; bench: number };
+    getRosterStatus: () => { qb: number; rb: number; wr: number; te: number; flex: number; dst: number; k: number; bench: number };
 };
 
 const initialRoster: Roster = {
     qb: null,
     rb: [],
     wr: [],
+    te: null,    // ✅ ADDED
     flex: null,
+    dst: null,   // ✅ ADDED
+    k: null,     // ✅ ADDED
     bench: [],
 };
 
@@ -61,7 +67,10 @@ export const RosterProvider = ({ children }: { children: React.ReactNode }) => {
 
     const isPlayerInRoster = (playerId: string) => {
         if (roster.qb?.id === playerId) return true;
+        if (roster.te?.id === playerId) return true;  // ✅ ADDED
         if (roster.flex?.id === playerId) return true;
+        if (roster.dst?.id === playerId) return true;  // ✅ ADDED
+        if (roster.k?.id === playerId) return true;    // ✅ ADDED
         if (roster.rb.some((p) => p.id === playerId)) return true;
         if (roster.wr.some((p) => p.id === playerId)) return true;
         if (roster.bench.some((p) => p.id === playerId)) return true;
@@ -139,33 +148,62 @@ export const RosterProvider = ({ children }: { children: React.ReactNode }) => {
                 return prev;
             }
 
-            // TE logic -> treat TE as flex-first
+            // TE logic -> treat TE as its own position first
             if (normalizedPos === "TE") {
+                if (!next.te) {
+                    next.te = player;
+                    result = { success: true, message: "Added to TE position" };
+                    return next;
+                }
+                // TE slot occupied, try flex
                 if (!next.flex) {
                     next.flex = player;
-                    result = { success: true, message: "Added to FLEX position (TE)" };
+                    result = { success: true, message: "TE slot full: added to FLEX" };
                     return next;
                 }
-                // flex is occupied -> try move existing flex to bench then place TE
+                // both TE and flex occupied -> try bench
                 if (benchHasSpace(next)) {
-                    next.bench.push(next.flex as Player);
-                    next.flex = player;
-                    result = { success: true, message: "Existing FLEX moved to bench, TE added to FLEX" };
+                    next.bench.push(player);
+                    result = { success: true, message: "TE and FLEX full: added to bench" };
                     return next;
                 }
-                // flex occupied and bench full -> reject
-                result = { success: false, message: "FLEX + bench full" };
+                result = { success: false, message: "TE, FLEX, and bench full" };
                 return prev;
             }
 
-            // Handle K, DST, and other positions - go straight to bench
-            if (normalizedPos === "K" || normalizedPos === "DST" || normalizedPos === "DEF") {
-                if (benchHasSpace(next)) {
-                    next.bench.push(player);
-                    result = { success: true, message: `${normalizedPos} added to bench` };
+            // DST logic
+            if (normalizedPos === "DST") {
+                if (!next.dst) {
+                    next.dst = player;
+                    result = { success: true, message: "Added to DST position" };
                     return next;
                 }
-                result = { success: false, message: "Bench full - cannot add " + normalizedPos };
+                // DST occupied -> bench if possible
+                if (benchHasSpace(next)) {
+                    next.bench.push(next.dst as Player);
+                    next.dst = player;
+                    result = { success: true, message: "Existing DST moved to bench, new DST added" };
+                    return next;
+                }
+                result = { success: false, message: "No bench space to move existing DST" };
+                return prev;
+            }
+
+            // K logic
+            if (normalizedPos === "K") {
+                if (!next.k) {
+                    next.k = player;
+                    result = { success: true, message: "Added to K position" };
+                    return next;
+                }
+                // K occupied -> bench if possible
+                if (benchHasSpace(next)) {
+                    next.bench.push(next.k as Player);
+                    next.k = player;
+                    result = { success: true, message: "Existing K moved to bench, new K added" };
+                    return next;
+                }
+                result = { success: false, message: "No bench space to move existing K" };
                 return prev;
             }
 
@@ -211,14 +249,19 @@ export const RosterProvider = ({ children }: { children: React.ReactNode }) => {
                     if (p.id === playerId) removed = true;
                     return p.id !== playerId;
                 }),
+                te: prev.te && prev.te.id === playerId ? null : prev.te,  // ✅ ADDED
                 flex: prev.flex && prev.flex.id === playerId ? null : prev.flex,
+                dst: prev.dst && prev.dst.id === playerId ? null : prev.dst,  // ✅ ADDED
+                k: prev.k && prev.k.id === playerId ? null : prev.k,  // ✅ ADDED
                 bench: prev.bench.filter((p) => {
                     if (p.id === playerId) removed = true;
                     return p.id !== playerId;
                 }),
             };
-            // also check QB removal flag
-            if (prev.qb?.id === playerId) removed = true;
+            // also check other single position removals
+            if (prev.qb?.id === playerId || prev.te?.id === playerId || prev.dst?.id === playerId || prev.k?.id === playerId) {
+                removed = true;
+            }
             return next;
         });
         return removed;
@@ -230,7 +273,10 @@ export const RosterProvider = ({ children }: { children: React.ReactNode }) => {
         qb: roster.qb ? 1 : 0,
         rb: roster.rb.length,
         wr: roster.wr.length,
+        te: roster.te ? 1 : 0,   // ✅ ADDED
         flex: roster.flex ? 1 : 0,
+        dst: roster.dst ? 1 : 0,  // ✅ ADDED
+        k: roster.k ? 1 : 0,      // ✅ ADDED
         bench: roster.bench.length,
     });
 
