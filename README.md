@@ -50,12 +50,12 @@ The application is fully functional and tested. Ongoing work focuses on enhancin
 
 ## Demo
 
-Product demos and walkthrough videos are available on my LinkedIn profile and showcase:
+Product demos and walkthrough video us available on my LinkedIn profile:
 - Full mock draft flows  
 - AI-driven draft insights  
 - Live UI interactions  
 
-👉 LinkedIn: https://www.linkedin.com/in/Eshaan-Shah0
+👉 LinkedIn: https://www.linkedin.com/posts/eshaan-shah0_when-i-first-started-playing-fantasy-football-activity-7391835707948048384-Oblu?utm_source=share&utm_medium=member_desktop&rcm=ACoAADcSqZ4BH7r5BwAUQsIraB7QFXVXCVQ78dk
 
 ---
 
