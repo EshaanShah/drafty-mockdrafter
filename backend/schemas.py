@@ -1,6 +1,5 @@
-from pydantic import BaseModel
-from typing import List, Optional
-
+from typing import List, Optional, Literal
+from pydantic import BaseModel, Field
 
 # --------------------
 # Core domain models
@@ -54,10 +53,15 @@ class DraftRequest(BaseModel):
 
 
 class DraftResponse(BaseModel):
-    """
-    Output from the draft recommendation engine.
-    Pure recommendation, no mutation.
-    """
     draft_id: str
-    recommendation: Player
-    reason: str
+    verdict: Literal[
+        "STEAL",
+        "GOOD VALUE",
+        "FAIR VALUE",
+        "REACH"
+    ]
+    explanation: str = Field(
+        ...,
+        min_length=10,
+        description="Short explanation justifying the verdict"
+    )

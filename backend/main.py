@@ -1,56 +1,39 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-
-from schemas import DraftRequest
-
+import logging
 from dotenv import load_dotenv
 import os
 
-load_dotenv(dotenv_path=".env")
-
-GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
-if not GOOGLE_API_KEY:
-    raise RuntimeError("GOOGLE_API_KEY is not set")
-
-# Create app
-app = FastAPI(
-    title="My FastAPI App",
-    description="Backend API built with FastAPI",
-    version="1.0.0",
-)
-
-# CORS (adjust origins later)
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],  # change to frontend URL in prod
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-# Health check
-@app.get("/health", tags=["Health"])
-def health_check():
-    return {"status": "ok"}
-
-from fastapi import FastAPI, Request
-from fastapi.middleware.cors import CORSMiddleware
-import logging
+from schemas import DraftRequest, DraftResponse
+from agent.draft_agent import generate_recommendation
+from agent.output_parser import parse_agent_output
 
 # --------------------
-# Logging setup
+# Env
+# --------------------
+load_dotenv()
+
+# Optional sanity check
+if not os.getenv("GROQ_API_KEY"):
+    raise RuntimeError("GROQ_API_KEY is not set")
+
+# --------------------
+# Logging
 # --------------------
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # --------------------
-# App setup
+# App
 # --------------------
-app = FastAPI(title="Draft Assistant API")
+app = FastAPI(
+    title="Draft Assistant API",
+    version="1.0.0"
+)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # tighten later
+    allow_origins=["*"],
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -59,31 +42,27 @@ app.add_middleware(
 # Routes
 # --------------------
 
-from agent.draft_agent import generate_recommendation
-
-@app.post("/draft/recommend")
-async def recommend_draft(request: DraftRequest):
-    result = generate_recommendation(request)
-
-    return {
-        "draft_id": request.draft_id,
-        "recommendation": {
-            "name": "Placeholder Player"
-        },
-        "reason": result
-    }
-
 @app.get("/health")
 def health():
     return {"status": "ok"}
 
+@app.post("/draft/recommend", response_model=DraftResponse)
+def recommend_draft(request: DraftRequest):
+    raw_output = generate_recommendation(request)
 
+    logger.info(f"RAW AGENT OUTPUT: {repr(raw_output)}")
 
-# Root
-@app.get("/", tags=["Root"])
+    try:
+        return parse_agent_output(
+            raw_text=raw_output,
+            draft_id=request.draft_id
+        )
+    except ValueError as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Agent output parsing failed: {str(e)}"
+        )
+
+@app.get("/")
 def root():
     return {"message": "API is live"}
-
-# Example router import
-# from app.api.routes import users
-# app.include_router(users.router, prefix="/users", tags=["Users"])
