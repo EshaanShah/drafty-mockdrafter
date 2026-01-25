@@ -29,8 +29,8 @@ const DraftContext = createContext<DraftContextType | undefined>(undefined);
 // 3. Provider that holds all draft state
 export const DraftProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     // Core draft state
-    const [round, setRound] = useState(1);
-    const [pick, setPick] = useState(1);
+    const [round, setRound] = useState(5);
+    const [pick, setPick] = useState(7);
     const [timeLeft, setTimeLeft] = useState(60);
 
     // Setup state (filled from DraftSetup screen)
