@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Image, Alert } from 'react-native';
+import { View, Text, TouchableOpacity, Alert } from 'react-native';
 import { useRouter } from 'expo-router';   // ✅ use the hook
 import { useRoster } from '@/contexts/RosterContext'; // Import the roster context
 import {useDraft} from '@/contexts/DraftContext'
@@ -12,7 +12,7 @@ interface PlayerCardProps {
 const PlayerCard: React.FC<PlayerCardProps> = ({ PlayerName, PlayerPosition, PlayerTeam }) => {
     const router = useRouter();
     const { addPlayer, isPlayerDrafted } = useRoster();
-    const draft =useDraft();
+    const { advancePick, round, pick, isUserTurn } = useDraft();
 
     // Check if this player is already drafted
     const isDrafted = isPlayerDrafted(PlayerName); // Using name as ID for simplicity
@@ -21,18 +21,26 @@ const PlayerCard: React.FC<PlayerCardProps> = ({ PlayerName, PlayerPosition, Pla
     const handleDraft = (e: any) => {
         e.stopPropagation(); // Prevent the card navigation when pressing draft
 
+        if (!isUserTurn) {
+            Alert.alert('Bot Pick Pending', 'Please wait until your next pick.');
+            return;
+        }
+
         // Create player object
         const player = {
             id: PlayerName, // Using name as ID (you might want to use a real ID later)
             name: PlayerName,
             position: PlayerPosition,
-            team: PlayerTeam
+            team: PlayerTeam,
+            round,
+            pick,
         };
 
         // Try to add player to roster
         const result = addPlayer(player);
 
         if (result.success) {
+            advancePick();
 
             Alert.alert('Success!', `${PlayerName} has been drafted!`);
 
@@ -72,17 +80,17 @@ const PlayerCard: React.FC<PlayerCardProps> = ({ PlayerName, PlayerPosition, Pla
                 {/* RIGHT SIDE - Draft Button */}
                 <TouchableOpacity
                     className={`border rounded-md px-4 py-2 ml-4 ${
-                        isDrafted
+                        isDrafted || !isUserTurn
                             ? 'bg-gray-300 border-gray-400'
                             : 'bg-light border-gray'
                     }`}
                     onPress={handleDraft}
-                    disabled={isDrafted} // Disable if already drafted
+                    disabled={isDrafted || !isUserTurn} // Disable if already drafted or a bot placeholder pick is active
                 >
                     <Text className={`font-pingfang-bold ${
-                        isDrafted ? 'text-gray-500' : 'text-gray-800'
+                        isDrafted || !isUserTurn ? 'text-gray-500' : 'text-gray-800'
                     }`}>
-                        {isDrafted ? 'Drafted' : 'Draft'}
+                        {isDrafted ? 'Drafted' : isUserTurn ? 'Draft' : 'Waiting'}
                     </Text>
                 </TouchableOpacity>
             </View>

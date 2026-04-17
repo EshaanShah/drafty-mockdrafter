@@ -6,6 +6,8 @@ export type Player = {
     name: string;
     position: string;
     team?: string;
+    round?: number;
+    pick?: number;
     adp?: number;
     proj?: number;
     ppg?: number;

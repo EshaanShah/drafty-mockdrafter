@@ -4,27 +4,32 @@ import {router, useLocalSearchParams} from 'expo-router';
 import {images} from "@/constants";
 import {RosterContext, useRoster} from '@/contexts/RosterContext'; // Import the roster context
 import { generatePlayerAnalysis } from '@/services/aiService'; // Import your API function
+import { useDraft } from '@/contexts/DraftContext';
 
 
 export default function PlayerScreen() {
     const { name, position, team } = useLocalSearchParams();
+    const playerName = Array.isArray(name) ? name[0] : name;
+    const playerPosition = Array.isArray(position) ? position[0] : position;
+    const playerTeam = Array.isArray(team) ? team[0] : team;
     const { roster } = useContext(RosterContext)!;
     const [reachStatus, setStatus] = useState('reach');
     const [aiAnalysis, setAiAnalysis] = useState('Loading AI analysis...'); // New state for AI analysis
 
     // Get roster functions
     const { addPlayer, isPlayerDrafted } = useRoster();
+    const { advancePick, round, pick, totalTeams, leagueFormat, isUserTurn, isBotPickPending } = useDraft();
 
     // Generate AI analysis when component mounts
     useEffect(() => {
         const getAIAnalysis = async () => {
             const playerData = {
-                name: name as string,
-                position: position as string,
-                team: team as string,
-                round: 5, // You'll need to get this from somewhere
-                pick: 67, // You'll need to get this from somewhere
-                league: "12-team PPR" // You'll need to get this from somewhere
+                name: playerName ?? '',
+                position: playerPosition ?? '',
+                team: playerTeam ?? '',
+                round,
+                pick,
+                league: `${totalTeams}-team ${leagueFormat}`
             };
 
             try {
@@ -39,33 +44,40 @@ export default function PlayerScreen() {
                 } else {
                     setStatus('reach');
                 }
-            } catch (error) {
+            } catch {
                 setAiAnalysis("Unable to generate analysis. Please try again later.");
             }
         };
 
         getAIAnalysis();
-    }, [name, position, team, roster]); // Re-run if any of these change
+    }, [leagueFormat, pick, playerName, playerPosition, playerTeam, roster, round, totalTeams]); // Re-run if any of these change
 
     // Check if this player is already drafted
-    const isDrafted = isPlayerDrafted(name as string); // Using name as ID for simplicity
+    const isDrafted = isPlayerDrafted(playerName ?? ''); // Using name as ID for simplicity
 
     // Handle draft button press
     const handleDraft = (e: any) => {
         e.stopPropagation(); // Prevent the card navigation when pressing draft
 
+        if (!isUserTurn) {
+            Alert.alert('Bot Pick Pending', 'Please wait until your next pick.');
+            return;
+        }
 
         const player = {
-            id: name, // Using name as ID (you might want to use a real ID later)
-            name: name,
-            position: position,
-            team: team
+            id: playerName ?? '', // Using name as ID (you might want to use a real ID later)
+            name: playerName ?? '',
+            position: playerPosition ?? '',
+            team: playerTeam ?? '',
+            round,
+            pick,
         };
 
         const result = addPlayer(player);
 
         if (result.success) {
-            Alert.alert('Success!', `${name} has been drafted!`);
+            advancePick();
+            Alert.alert('Success!', `${playerName} has been drafted!`);
         } else {
             Alert.alert('Cannot Draft', result.message || 'Unable to draft player');
         }
@@ -101,10 +113,10 @@ export default function PlayerScreen() {
                         {/* Player Info */}
                         <View className="flex-1">
                             <Text className="text-black text-xl font-pingfang-bold">
-                                {name || "Player Name"}
+                                {playerName || "Player Name"}
                             </Text>
                             <Text className="text-gray-600 font-pingfang">
-                                {position || "QB"} – {team || "Team"}
+                                {playerPosition || "QB"} – {playerTeam || "Team"}
                             </Text>
                             <Text className="text-gray-500 text-sm font-pingfang">
                                 Age Unknown
@@ -179,21 +191,21 @@ export default function PlayerScreen() {
                 </View>
 
                 <View className ={`flex-1 justify-center rounded-xl items-center mt-8 mx-10 w-96 p-4 ${reachStatus === 'reach' ? 'bg-red-300 text-white' : reachStatus === 'goodValue' ? 'bg-green-500 text-white'  : 'bg-white text-black'}  `}  >
-                    <Text className="text-lg font-pingfang-bold">Reach pick based on your roster, league settings, and who's on the board  </Text>
+                    <Text className="text-lg font-pingfang-bold">Reach pick based on your roster, league settings, and who is on the board  </Text>
                 </View>
                 <TouchableOpacity
                     className={`items-center justify-center mx-10 mb-7 w-96 mt-6 border-light p-6 border-2 ${
-                        isDrafted
+                        isDrafted || isBotPickPending
                             ? 'bg-gray-300 border-gray-400'
                             : 'bg-light border-gray'
                     }`}
                     onPress={handleDraft}
-                    disabled={isDrafted} // Disable if already drafted
+                    disabled={isDrafted || isBotPickPending} // Disable if already drafted or a bot placeholder pick is active
                 >
                     <Text className={`font-pingfang-bold ${
-                        isDrafted ? 'text-gray-500' : 'text-gray-800'
+                        isDrafted || isBotPickPending ? 'text-gray-500' : 'text-gray-800'
                     }`}>
-                        {isDrafted ? 'Drafted' : 'Draft'}
+                        {isDrafted ? 'Drafted' : isBotPickPending ? 'Waiting' : 'Draft'}
                     </Text>
                 </TouchableOpacity>
 

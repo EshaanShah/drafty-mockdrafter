@@ -2,13 +2,26 @@ import React, {useEffect, useState} from 'react';
 import {View, Text, SafeAreaView, Animated, TextInput, TouchableOpacity} from 'react-native';
 import ScrollView = Animated.ScrollView;
 import { router } from 'expo-router';
+import { useDraft } from '@/contexts/DraftContext';
+
+type SetupLeagueFormat = 'Half PPR' | 'PPR' | 'Standard';
+type SetupDraftOrder = 'Snake' | 'Linear';
+
+const normalizeLeagueFormat = (format: SetupLeagueFormat) => {
+    if (format === 'Half PPR') {
+        return 'Half-PPR';
+    }
+
+    return format;
+};
 
 const SetupScreen = () => {
+    const { configureDraft } = useDraft();
 
     const [selectedTime, setSelectedTime] = useState(60);
     const timeOptions = [30, 45, 60, 75, 90, 120];
-    const [selectedFormat, setSelectedFormat] = useState('Half PPR');
-    const [DraftOrder, setDraftOrder] = useState('Snake');
+    const [selectedFormat, setSelectedFormat] = useState<SetupLeagueFormat>('Half PPR');
+    const [DraftOrder, setDraftOrder] = useState<SetupDraftOrder>('Snake');
     const [numberOfTeams, setNumberOfTeams] = useState('6');
     const [selectedPick, setSelectedPick] = useState(2);
 
@@ -19,6 +32,20 @@ const SetupScreen = () => {
             setSelectedPick(0); // Reset to first pick if current selection is out of range
         }
     }, [numberOfTeams, selectedPick]);
+
+    const handleStartDrafting = () => {
+        const teamCount = Math.min(Math.max(parseInt(numberOfTeams, 10) || 6, 1), 14);
+
+        configureDraft({
+            timerDuration: selectedTime,
+            totalTeams: teamCount,
+            userPickNumber: selectedPick + 1,
+            leagueFormat: normalizeLeagueFormat(selectedFormat),
+            draftOrder: DraftOrder,
+        });
+
+        router.push("/(draftTabs)/draftScreen");
+    };
 
 
     return (
@@ -102,10 +129,10 @@ const SetupScreen = () => {
 
             </View>
 
-        </View>
+            </View>
             <TouchableOpacity
                 className = "mx-auto my-16 py-6 bg-light rounded-md w-48"
-                onPress={()=> router.push("/(draftTabs)/draftScreen")}
+                onPress={handleStartDrafting}
             >
                 <Text className = "mx-auto font-pingfang-bold ">Start Drafting</Text>
             </TouchableOpacity>

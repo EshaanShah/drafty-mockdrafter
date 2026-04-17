@@ -50,7 +50,7 @@ const PlayerCard = ({ player, position, isEmpty = false }) => {
             <View className="ml-3 flex-1">
                 <Text className="font-pingfang-bold text-gray-900 text-base">{player.name}</Text>
                 <Text className="text-gray-600 text-sm font-pingfang">
-                    {player.team} • {player.position} • R{player.round}P{player.pick}
+                    {player.team} • {player.position} {player.round && player.pick ? `• R${player.round}P${player.pick}` : ''}
                 </Text>
             </View>
             {player.starred && (
