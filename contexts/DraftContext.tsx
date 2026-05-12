@@ -17,6 +17,8 @@ type DraftContextType = {
     currentOverallPick: number;              // Current overall draft pick cursor
     round: number;                           // Current draft round (starts at 1)
     pick: number;                            // Current pick within the round (starts at 1)
+    nextUserPick?: number;                   // Next overall pick owned by the user
+    picksUntilNextUserPick?: number;         // Distance from current pick to next user pick
     teamOnClock: number;                     // Draft position currently making a pick
     isUserTurn: boolean;                     // Whether the user can draft right now
     isBotPickPending: boolean;               // Placeholder state for future bot picks
@@ -28,6 +30,7 @@ type DraftContextType = {
     totalTeams: number;                      // How many teams are drafting (e.g. 12)
     userPickNumber: number;                  // The user’s pick position (e.g. 7th overall)
     draftOrder: DraftOrder;                  // Snake or linear draft order
+    draftedPlayerIds: string[];              // Player IDs already selected in this draft
 
     // League info
     leagueFormat: LeagueFormat;              // Default is PPR
@@ -45,6 +48,7 @@ type DraftContextType = {
     resetTimer: () => void;
     tickTimer: () => void;
     advancePick: () => void;
+    recordDraftedPlayer: (playerId: string) => void;
 };
 
 // 2. Create the context
@@ -70,6 +74,28 @@ const getTeamOnClock = (round: number, pick: number, totalTeams: number, draftOr
     return Math.max(totalTeams, 1) - pick + 1;
 };
 
+const getNextUserPick = (
+    currentOverallPick: number,
+    totalTeams: number,
+    userPickNumber: number,
+    draftOrder: DraftOrder
+) => {
+    const safeTeams = Math.max(totalTeams, 1);
+    const safeUserPick = Math.min(Math.max(userPickNumber, 1), safeTeams);
+
+    for (let overallPick = currentOverallPick + 1; overallPick <= currentOverallPick + safeTeams * 2; overallPick += 1) {
+        const roundForPick = getRoundFromOverallPick(overallPick, safeTeams);
+        const pickInRound = getPickInRoundFromOverallPick(overallPick, safeTeams);
+        const teamForPick = getTeamOnClock(roundForPick, pickInRound, safeTeams, draftOrder);
+
+        if (teamForPick === safeUserPick) {
+            return overallPick;
+        }
+    }
+
+    return undefined;
+};
+
 // 3. Provider that holds all draft state
 export const DraftProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     // Core draft state
@@ -78,6 +104,7 @@ export const DraftProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const [timerDuration, setTimerDuration] = useState(60);
     const [isTimerRunning, setIsTimerRunning] = useState(false);
     const [isDraftConfigured, setIsDraftConfigured] = useState(false);
+    const [draftedPlayerIds, setDraftedPlayerIds] = useState<string[]>([]);
 
     // Setup state (filled from DraftSetup screen)
     const [totalTeams, setTotalTeams] = useState(6); // will be set in setup
@@ -105,6 +132,13 @@ export const DraftProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const isUserTurn = teamOnClock === userPickNumber;
     const isBotPickPending = !isUserTurn;
 
+    const nextUserPick = useMemo(
+        () => getNextUserPick(currentOverallPick, totalTeams, userPickNumber, draftOrder),
+        [currentOverallPick, draftOrder, totalTeams, userPickNumber]
+    );
+
+    const picksUntilNextUserPick = nextUserPick ? nextUserPick - currentOverallPick : undefined;
+
     const resetTimer = useCallback(() => {
         setTimeLeft(timerDuration);
     }, [timerDuration]);
@@ -113,6 +147,16 @@ export const DraftProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         setCurrentOverallPick((currentPick) => currentPick + 1);
         setTimeLeft(timerDuration);
     }, [timerDuration]);
+
+    const recordDraftedPlayer = useCallback((playerId: string) => {
+        if (!playerId) {
+            return;
+        }
+
+        setDraftedPlayerIds((currentIds) => (
+            currentIds.includes(playerId) ? currentIds : [...currentIds, playerId]
+        ));
+    }, []);
 
     const tickTimer = useCallback(() => {
         if (!isTimerRunning || !isUserTurn) {
@@ -141,6 +185,7 @@ export const DraftProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         setUserPickNumber(safeUserPickNumber);
         setLeagueFormat(options.leagueFormat);
         setDraftOrder(options.draftOrder);
+        setDraftedPlayerIds([]);
         setIsTimerRunning(true);
         setIsDraftConfigured(true);
     }, []);
@@ -172,6 +217,8 @@ export const DraftProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             currentOverallPick,
             round,
             pick,
+            nextUserPick,
+            picksUntilNextUserPick,
             teamOnClock,
             isUserTurn,
             isBotPickPending,
@@ -181,6 +228,7 @@ export const DraftProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             totalTeams,
             userPickNumber,
             draftOrder,
+            draftedPlayerIds,
             leagueFormat,
             setTimeLeft,
             setTotalTeams,
@@ -192,11 +240,14 @@ export const DraftProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             resetTimer,
             tickTimer,
             advancePick,
+            recordDraftedPlayer,
         }),
         [
             currentOverallPick,
             round,
             pick,
+            nextUserPick,
+            picksUntilNextUserPick,
             teamOnClock,
             isUserTurn,
             isBotPickPending,
@@ -206,6 +257,7 @@ export const DraftProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             totalTeams,
             userPickNumber,
             draftOrder,
+            draftedPlayerIds,
             leagueFormat,
             configureDraft,
             startTimer,
@@ -213,6 +265,7 @@ export const DraftProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             resetTimer,
             tickTimer,
             advancePick,
+            recordDraftedPlayer,
         ]
     );
 

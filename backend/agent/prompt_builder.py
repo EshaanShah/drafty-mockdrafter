@@ -15,8 +15,23 @@ def build_roster_string(request: DraftRequest) -> str:
         f"QB: {roster.qb.name if roster.qb else 'Empty'}\n"
         f"RB: {[p.name for p in roster.rb]}\n"
         f"WR: {[p.name for p in roster.wr]}\n"
+        f"TE: {roster.te.name if roster.te else 'Empty'}\n"
         f"FLEX: {roster.flex.name if roster.flex else 'Empty'}\n"
+        f"DST: {roster.dst.name if roster.dst else 'Empty'}\n"
+        f"K: {roster.k.name if roster.k else 'Empty'}\n"
         f"BENCH: {[p.name for p in roster.bench]}"
+    )
+
+
+def build_available_players_string(request: DraftRequest, limit: int = 12) -> str:
+    if not request.available_players:
+        return "No available board data supplied."
+
+    players = request.available_players[:limit]
+
+    return "\n".join(
+        f"- {player.name} ({player.position or 'UNK'}, ADP {player.overall_adp if player.overall_adp is not None else 'N/A'})"
+        for player in players
     )
 
 
@@ -29,7 +44,7 @@ def build_agent_policy_prompt() -> str:
 You are a fantasy football draft assistant.
 
 This is a temporary testing mode without tool calling.
-Use only the supplied player, roster, round, pick, and league context.
+Use only the supplied player, ADP, roster, draft position, and board context.
 Do not invent exact ADP, injury status, news, or trend data.
 If exact factual data is unavailable, explicitly say it is unavailable.
 Give a cautious draft recommendation based on the provided context.

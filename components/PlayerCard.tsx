@@ -3,19 +3,22 @@ import { View, Text, TouchableOpacity, Alert } from 'react-native';
 import { useRouter } from 'expo-router';   // ✅ use the hook
 import { useRoster } from '@/contexts/RosterContext'; // Import the roster context
 import {useDraft} from '@/contexts/DraftContext'
+import { normalizePosition } from '@/utils/draftAi';
 interface PlayerCardProps {
+    PlayerId: string;
     PlayerName: string;
     PlayerPosition: string;
     PlayerTeam: string;
+    OverallADP?: string | number;
 }
 
-const PlayerCard: React.FC<PlayerCardProps> = ({ PlayerName, PlayerPosition, PlayerTeam }) => {
+const PlayerCard: React.FC<PlayerCardProps> = ({ PlayerId, PlayerName, PlayerPosition, PlayerTeam, OverallADP }) => {
     const router = useRouter();
     const { addPlayer, isPlayerDrafted } = useRoster();
-    const { advancePick, round, pick, isUserTurn } = useDraft();
+    const { advancePick, recordDraftedPlayer, round, pick, isUserTurn } = useDraft();
 
     // Check if this player is already drafted
-    const isDrafted = isPlayerDrafted(PlayerName); // Using name as ID for simplicity
+    const isDrafted = isPlayerDrafted(PlayerId || PlayerName);
 
     // Handle draft button press
     const handleDraft = (e: any) => {
@@ -27,10 +30,15 @@ const PlayerCard: React.FC<PlayerCardProps> = ({ PlayerName, PlayerPosition, Pla
         }
 
         // Create player object
+        const normalizedPosition = normalizePosition(PlayerPosition);
+        const overallAdp = Number(OverallADP);
         const player = {
-            id: PlayerName, // Using name as ID (you might want to use a real ID later)
+            id: PlayerId || PlayerName,
             name: PlayerName,
-            position: PlayerPosition,
+            position: normalizedPosition.position,
+            positionRank: normalizedPosition.positionRank,
+            posADP: PlayerPosition,
+            overallADP: Number.isFinite(overallAdp) ? overallAdp : undefined,
             team: PlayerTeam,
             round,
             pick,
@@ -40,6 +48,7 @@ const PlayerCard: React.FC<PlayerCardProps> = ({ PlayerName, PlayerPosition, Pla
         const result = addPlayer(player);
 
         if (result.success) {
+            recordDraftedPlayer(player.id);
             advancePick();
 
             Alert.alert('Success!', `${PlayerName} has been drafted!`);
@@ -56,9 +65,11 @@ const PlayerCard: React.FC<PlayerCardProps> = ({ PlayerName, PlayerPosition, Pla
                 router.push({
                     pathname: "/(draftTabs)/[name]",
                     params: {
+                        id: PlayerId,
                         name: PlayerName,
-                        position: PlayerPosition,
+                        posADP: PlayerPosition,
                         team: PlayerTeam || "",
+                        overallADP: OverallADP?.toString() ?? "",
                     },
                 })
             }

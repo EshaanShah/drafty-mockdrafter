@@ -3,7 +3,7 @@ from dotenv import load_dotenv
 from langchain_groq import ChatGroq
 from langchain_core.messages import SystemMessage, HumanMessage
 
-from agent.prompt_builder import build_agent_policy_prompt, build_roster_string
+from agent.prompt_builder import build_agent_policy_prompt, build_roster_string, build_available_players_string
 from schemas import DraftRequest
 import os
 
@@ -31,16 +31,38 @@ def generate_recommendation(request: DraftRequest) -> str:
     )
 
     roster_string = build_roster_string(request)
+    available_players_string = build_available_players_string(request)
+    context = request.context
 
     user_message = HumanMessage(
         content=f"""
 Player: {request.player.name}
-Round: {request.context.round}
-Pick: {request.context.pick}
-League: {request.context.league}
+Player ID: {request.player.id}
+Position: {request.player.position}
+Position Rank: {request.player.position_rank}
+Overall ADP: {request.player.overall_adp}
+Positional ADP: {request.player.pos_adp}
+Team: {request.player.team}
+
+Round: {context.round}
+Pick In Round: {context.pick}
+Current Overall Pick: {context.current_overall_pick}
+Next User Pick: {context.next_user_pick}
+Picks Until Next User Pick: {context.picks_until_next_user_pick}
+Team On Clock: {context.team_on_clock}
+Total Teams: {context.total_teams}
+User Pick Number: {context.user_pick_number}
+Draft Order: {context.draft_order}
+League Format: {context.league_format or context.league}
 
 Roster Snapshot:
 {roster_string}
+
+Drafted Player IDs:
+{request.drafted_player_ids}
+
+Top Available Players By ADP:
+{available_players_string}
 """.strip()
     )
 

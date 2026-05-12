@@ -48,6 +48,12 @@ def health():
 
 @app.post("/draft/recommend", response_model=DraftResponse)
 def recommend_draft(request: DraftRequest):
+    if logger.isEnabledFor(logging.INFO):
+        try:
+            logger.info("DRAFT REQUEST: %s", request.model_dump_json())
+        except AttributeError:
+            logger.info("DRAFT REQUEST: %s", request.json())
+
     raw_output = generate_recommendation(request)
 
     logger.info(f"RAW AGENT OUTPUT: {repr(raw_output)}")

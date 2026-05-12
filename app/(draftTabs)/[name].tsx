@@ -1,35 +1,73 @@
-import React, {useContext, useEffect, useState} from 'react';
+import React, {useContext, useEffect, useMemo, useState} from 'react';
 import {View, Text, TouchableOpacity, Image, ScrollView, Alert} from 'react-native';
 import {router, useLocalSearchParams} from 'expo-router';
 import {images} from "@/constants";
 import {RosterContext, useRoster} from '@/contexts/RosterContext'; // Import the roster context
 import { generatePlayerAnalysis } from '@/services/aiService'; // Import your API function
 import { useDraft } from '@/contexts/DraftContext';
+import adp from "../../adp_halfPPR.json";
+import { getAvailablePlayersSnapshot, normalizePosition } from '@/utils/draftAi';
 
 
 export default function PlayerScreen() {
-    const { name, position, team } = useLocalSearchParams();
+    const { id, name, posADP, overallADP, team } = useLocalSearchParams();
+    const playerId = Array.isArray(id) ? id[0] : id;
     const playerName = Array.isArray(name) ? name[0] : name;
-    const playerPosition = Array.isArray(position) ? position[0] : position;
+    const playerPosADP = Array.isArray(posADP) ? posADP[0] : posADP;
+    const playerOverallADP = Array.isArray(overallADP) ? overallADP[0] : overallADP;
     const playerTeam = Array.isArray(team) ? team[0] : team;
+    const normalizedPlayerPosition = useMemo(
+        () => normalizePosition(playerPosADP),
+        [playerPosADP]
+    );
     const { roster } = useContext(RosterContext)!;
     const [reachStatus, setStatus] = useState('reach');
     const [aiAnalysis, setAiAnalysis] = useState('Loading AI analysis...'); // New state for AI analysis
 
     // Get roster functions
     const { addPlayer, isPlayerDrafted } = useRoster();
-    const { advancePick, round, pick, totalTeams, leagueFormat, isUserTurn, isBotPickPending } = useDraft();
+    const {
+        advancePick,
+        recordDraftedPlayer,
+        currentOverallPick,
+        round,
+        pick,
+        nextUserPick,
+        picksUntilNextUserPick,
+        teamOnClock,
+        totalTeams,
+        userPickNumber,
+        draftOrder,
+        leagueFormat,
+        isUserTurn,
+        isBotPickPending,
+        draftedPlayerIds,
+    } = useDraft();
 
     // Generate AI analysis when component mounts
     useEffect(() => {
         const getAIAnalysis = async () => {
             const playerData = {
+                id: playerId ?? playerName ?? '',
                 name: playerName ?? '',
-                position: playerPosition ?? '',
+                position: normalizedPlayerPosition.position,
+                positionRank: normalizedPlayerPosition.positionRank,
+                posADP: playerPosADP ?? '',
+                overallADP: playerOverallADP ? Number(playerOverallADP) : undefined,
                 team: playerTeam ?? '',
+                currentOverallPick,
                 round,
                 pick,
-                league: `${totalTeams}-team ${leagueFormat}`
+                nextUserPick,
+                picksUntilNextUserPick,
+                teamOnClock,
+                totalTeams,
+                userPickNumber,
+                draftOrder,
+                leagueFormat,
+                league: `${totalTeams}-team ${leagueFormat}`,
+                draftedPlayerIds,
+                availablePlayers: getAvailablePlayersSnapshot(adp.body.adpList, draftedPlayerIds, 12),
             };
 
             try {
@@ -37,7 +75,7 @@ export default function PlayerScreen() {
                 setAiAnalysis(analysis);
 
                 // You can also set the reach status based on the analysis
-                if (analysis.includes("Good Value")) {
+                if (analysis.includes("Steal") || analysis.includes("Good Value")) {
                     setStatus('goodValue');
                 } else if (analysis.includes("Fair Value")) {
                     setStatus('fairValue');
@@ -50,10 +88,30 @@ export default function PlayerScreen() {
         };
 
         getAIAnalysis();
-    }, [leagueFormat, pick, playerName, playerPosition, playerTeam, roster, round, totalTeams]); // Re-run if any of these change
+    }, [
+        currentOverallPick,
+        draftOrder,
+        draftedPlayerIds,
+        leagueFormat,
+        nextUserPick,
+        pick,
+        picksUntilNextUserPick,
+        playerId,
+        playerName,
+        playerOverallADP,
+        playerPosADP,
+        playerTeam,
+        normalizedPlayerPosition.position,
+        normalizedPlayerPosition.positionRank,
+        roster,
+        round,
+        teamOnClock,
+        totalTeams,
+        userPickNumber,
+    ]);
 
     // Check if this player is already drafted
-    const isDrafted = isPlayerDrafted(playerName ?? ''); // Using name as ID for simplicity
+    const isDrafted = isPlayerDrafted(playerId ?? playerName ?? '');
 
     // Handle draft button press
     const handleDraft = (e: any) => {
@@ -64,18 +122,22 @@ export default function PlayerScreen() {
             return;
         }
 
-        const player = {
-            id: playerName ?? '', // Using name as ID (you might want to use a real ID later)
-            name: playerName ?? '',
-            position: playerPosition ?? '',
-            team: playerTeam ?? '',
-            round,
-            pick,
+            const player = {
+                id: playerId ?? playerName ?? '',
+                name: playerName ?? '',
+                position: normalizedPlayerPosition.position,
+                positionRank: normalizedPlayerPosition.positionRank,
+                posADP: playerPosADP ?? '',
+                overallADP: playerOverallADP ? Number(playerOverallADP) : undefined,
+                team: playerTeam ?? '',
+                round,
+                pick,
         };
 
         const result = addPlayer(player);
 
         if (result.success) {
+            recordDraftedPlayer(player.id);
             advancePick();
             Alert.alert('Success!', `${playerName} has been drafted!`);
         } else {
@@ -116,7 +178,7 @@ export default function PlayerScreen() {
                                 {playerName || "Player Name"}
                             </Text>
                             <Text className="text-gray-600 font-pingfang">
-                                {playerPosition || "QB"} – {playerTeam || "Team"}
+                                {playerPosADP || "QB"} – {playerTeam || "Team"}
                             </Text>
                             <Text className="text-gray-500 text-sm font-pingfang">
                                 Age Unknown
@@ -151,7 +213,7 @@ export default function PlayerScreen() {
                             </View>
 
                             <View className = "item-center flex-1">
-                                <Text className="font-pingfang-bold text-lg ">183 </Text>
+                                <Text className="font-pingfang-bold text-lg ">{playerOverallADP || "N/A"} </Text>
                                 <Text>ADP</Text>
 
                             </View>

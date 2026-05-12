@@ -73,9 +73,11 @@ const DraftScreen = () => {
                 keyExtractor={(item, index) => (item.playerID ? item.playerID.toString() : index.toString())}
                 renderItem={({ item }) => (
                     <PlayerCard
+                        PlayerId={item.playerID?.toString() ?? item.longName}
                         PlayerName={item.longName}
                         PlayerPosition={item.posADP}
                         PlayerTeam={item.teamAbv ?? "Unknown"}
+                        OverallADP={item.overallADP}
                     />
                 )}
             />
