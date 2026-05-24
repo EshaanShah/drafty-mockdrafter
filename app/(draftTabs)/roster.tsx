@@ -1,8 +1,34 @@
 import { Text, View, ScrollView, TouchableOpacity, SafeAreaView } from "react-native";
-import { RosterContext } from '@/contexts/RosterContext';
+import { Player, RosterContext } from '@/contexts/RosterContext';
 import { useContext, useState } from "react";
 
-const PositionBadge = ({ position, variant = "default" }) => {
+type PositionBadgeProps = {
+    position: string;
+};
+
+type RosterPlayer = Player & {
+    starred?: boolean;
+};
+
+type PlayerCardProps = {
+    player?: RosterPlayer | null;
+    position: string;
+    isEmpty?: boolean;
+};
+
+type HeaderProps = {
+    title: string;
+};
+
+type SectionHeaderProps = HeaderProps & {
+    count: number;
+    maxCount: number;
+};
+
+type StarterPosition = 'qb' | 'rb' | 'wr' | 'te' | 'flex' | 'dst' | 'k';
+type ViewMode = 'roster' | 'draft';
+
+const PositionBadge = ({ position }: PositionBadgeProps) => {
     const getPositionStyle = () => {
         const baseStyle = "px-2 py-1 rounded text-xs font-pingfang-bold text-white text-center min-w-12";
 
@@ -32,7 +58,7 @@ const PositionBadge = ({ position, variant = "default" }) => {
     );
 };
 
-const PlayerCard = ({ player, position, isEmpty = false }) => {
+const PlayerCard = ({ player, position, isEmpty = false }: PlayerCardProps) => {
     if (isEmpty || !player) {
         return (
             <View className="flex-row items-center bg-gray-100 p-3 mb-2 rounded-lg border border-gray-200">
@@ -62,13 +88,13 @@ const PlayerCard = ({ player, position, isEmpty = false }) => {
     );
 };
 
-const PositionHeader = ({ title }) => (
+const PositionHeader = ({ title }: HeaderProps) => (
     <View className="mt-4 mb-2">
         <Text className="text-lg font-pingfang-bold text-gray-800 bg-gray-100 px-3 py-2 rounded">{title}</Text>
     </View>
 );
 
-const SectionHeader = ({ title, count, maxCount }) => (
+const SectionHeader = ({ title, count, maxCount }: SectionHeaderProps) => (
     <View className="flex-row items-center mb-3 mt-6">
         <Text className="text-xl font-pingfang-bold text-gray-900">{title}</Text>
         <View className="ml-auto bg-gray-200 px-2 py-1 rounded">
@@ -79,10 +105,10 @@ const SectionHeader = ({ title, count, maxCount }) => (
 
 export default function Roster() {
     const { roster } = useContext(RosterContext)!;
-    const [currentView, setCurrentView] = useState('roster'); // 'roster' or 'draft'
+    const [currentView, setCurrentView] = useState<ViewMode>('roster');
 
     // Calculate starter count
-    const starterPositions = ['qb', 'rb', 'wr', 'te', 'flex', 'dst', 'k'];
+    const starterPositions: StarterPosition[] = ['qb', 'rb', 'wr', 'te', 'flex', 'dst', 'k'];
     const starterCount = starterPositions.reduce((count, pos) => {
         if (pos === 'rb' || pos === 'wr') {
             return count + (roster[pos]?.length || 0);
@@ -101,18 +127,18 @@ export default function Roster() {
                 {/* Bottom Navigation */}
                 <View className="bg-white border-t border-gray-200 px-4 py-2 flex-row">
                     <TouchableOpacity
-                        className={`flex-1 py-3 rounded-lg mr-2 ${currentView === 'draft' ? 'bg-blue-500' : 'bg-gray-100'}`}
+                        className="flex-1 py-3 rounded-lg mr-2 bg-blue-500"
                         onPress={() => setCurrentView('draft')}
                     >
-                        <Text className={`text-center font-pingfang-bold ${currentView === 'draft' ? 'text-white' : 'text-gray-700'}`}>
+                        <Text className="text-center font-pingfang-bold text-white">
                             Draft
                         </Text>
                     </TouchableOpacity>
                     <TouchableOpacity
-                        className={`flex-1 py-3 rounded-lg ml-2 ${currentView === 'roster' ? 'bg-blue-500' : 'bg-gray-100'}`}
+                        className="flex-1 py-3 rounded-lg ml-2 bg-gray-100"
                         onPress={() => setCurrentView('roster')}
                     >
-                        <Text className={`text-center font-pingfang-bold ${currentView === 'roster' ? 'text-white' : 'text-gray-700'}`}>
+                        <Text className="text-center font-pingfang-bold text-gray-700">
                             Roster
                         </Text>
                     </TouchableOpacity>
@@ -211,13 +237,15 @@ export default function Roster() {
                     {/* Bench Section */}
                     <SectionHeader title="Bench" count={roster.bench?.length || 0} maxCount={6} />
 
-                    {roster.bench?.map((player, index) => (
-                        <PlayerCard
-                            key={index}
-                            player={player}
-                            position={`BEN${index + 1}`}
-                        />
-                    )) || (
+                    {roster.bench.length > 0 ? (
+                        roster.bench.map((player, index) => (
+                            <PlayerCard
+                                key={player.id || index}
+                                player={player}
+                                position={`BEN${index + 1}`}
+                            />
+                        ))
+                    ) : (
                         <>
                             <PlayerCard position="BEN1" isEmpty={true} />
                             <PlayerCard position="BEN2" isEmpty={true} />
@@ -229,18 +257,18 @@ export default function Roster() {
             {/* Bottom Navigation */}
             <View className="bg-white border-t border-gray-200 px-4 py-2 flex-row">
                 <TouchableOpacity
-                    className={`flex-1 py-3 rounded-lg mr-2 ${currentView === 'draft' ? 'bg-blue-500' : 'bg-gray-100'}`}
+                    className="flex-1 py-3 rounded-lg mr-2 bg-gray-100"
                     onPress={() => setCurrentView('draft')}
                 >
-                    <Text className={`text-center font-pingfang-bold ${currentView === 'draft' ? 'text-white' : 'text-gray-700'}`}>
+                    <Text className="text-center font-pingfang-bold text-gray-700">
                         Draft
                     </Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                    className={`flex-1 py-3 rounded-lg ml-2 ${currentView === 'roster' ? 'bg-blue-500' : 'bg-gray-100'}`}
+                    className="flex-1 py-3 rounded-lg ml-2 bg-blue-500"
                     onPress={() => setCurrentView('roster')}
                 >
-                    <Text className={`text-center font-pingfang-bold ${currentView === 'roster' ? 'text-white' : 'text-gray-700'}`}>
+                    <Text className="text-center font-pingfang-bold text-white">
                         Roster
                     </Text>
                 </TouchableOpacity>

@@ -1,4 +1,4 @@
-import React, {useContext, useEffect, useMemo, useState} from 'react';
+import React, {useContext, useEffect, useMemo, useRef, useState} from 'react';
 import {View, Text, TouchableOpacity, Image, ScrollView, Alert} from 'react-native';
 import {router, useLocalSearchParams} from 'expo-router';
 import {images} from "@/constants";
@@ -44,10 +44,20 @@ export default function PlayerScreen() {
         draftedPlayerIds,
     } = useDraft();
 
-    // Generate AI analysis when component mounts
-    useEffect(() => {
-        const getAIAnalysis = async () => {
-            const playerData = {
+    const analysisKey = playerId ?? playerName ?? '';
+    const analysisSnapshotRef = useRef<{
+        key: string;
+        playerData: Record<string, unknown>;
+        roster: typeof roster;
+        isDraftedAtOpen: boolean;
+    } | null>(null);
+
+    if (!analysisSnapshotRef.current || analysisSnapshotRef.current.key !== analysisKey) {
+        analysisSnapshotRef.current = {
+            key: analysisKey,
+            roster,
+            isDraftedAtOpen: isPlayerDrafted(analysisKey),
+            playerData: {
                 id: playerId ?? playerName ?? '',
                 name: playerName ?? '',
                 position: normalizedPlayerPosition.position,
@@ -68,10 +78,28 @@ export default function PlayerScreen() {
                 league: `${totalTeams}-team ${leagueFormat}`,
                 draftedPlayerIds,
                 availablePlayers: getAvailablePlayersSnapshot(adp.body.adpList, draftedPlayerIds, 12),
-            };
+            },
+        };
+    }
+
+    // Generate AI analysis once for the selected player using the page-open draft snapshot.
+    useEffect(() => {
+        const getAIAnalysis = async () => {
+            const snapshot = analysisSnapshotRef.current;
+
+            if (!snapshot || !snapshot.key) {
+                setAiAnalysis("Unable to generate analysis. Please try again later.");
+                return;
+            }
+
+            if (snapshot.isDraftedAtOpen) {
+                setAiAnalysis("This player has already been drafted.");
+                setStatus('reach');
+                return;
+            }
 
             try {
-                const analysis = await generatePlayerAnalysis(playerData, roster);
+                const analysis = await generatePlayerAnalysis(snapshot.playerData, snapshot.roster);
                 setAiAnalysis(analysis);
 
                 // You can also set the reach status based on the analysis
@@ -88,27 +116,7 @@ export default function PlayerScreen() {
         };
 
         getAIAnalysis();
-    }, [
-        currentOverallPick,
-        draftOrder,
-        draftedPlayerIds,
-        leagueFormat,
-        nextUserPick,
-        pick,
-        picksUntilNextUserPick,
-        playerId,
-        playerName,
-        playerOverallADP,
-        playerPosADP,
-        playerTeam,
-        normalizedPlayerPosition.position,
-        normalizedPlayerPosition.positionRank,
-        roster,
-        round,
-        teamOnClock,
-        totalTeams,
-        userPickNumber,
-    ]);
+    }, [analysisKey]);
 
     // Check if this player is already drafted
     const isDrafted = isPlayerDrafted(playerId ?? playerName ?? '');

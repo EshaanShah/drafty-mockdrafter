@@ -3,8 +3,8 @@ import {Text} from "react-native";
 import { Stack } from "expo-router";
 import {useFonts} from 'expo-font';
 import { RosterProvider } from "@/contexts/RosterContext";
-import {useEffect} from 'react';
 import {DraftProvider} from "@/contexts/DraftContext";
+import {AuthProvider} from "@/contexts/AuthContext";
 
 export default function RootLayout() {
   const [fontsLoaded] = useFonts({
@@ -23,14 +23,17 @@ export default function RootLayout() {
   }
 
   return (
+    <AuthProvider>
       <RosterProvider>
         <DraftProvider>
         <Stack screenOptions={{headerShown: false}}>
           <Stack.Screen name="index" />
+          <Stack.Screen name="home" />
           <Stack.Screen name="setupScreen" />
           <Stack.Screen name="(draftTabs)" options={{ headerShown: false }} />
         </Stack>
           </DraftProvider>
       </RosterProvider>
+    </AuthProvider>
   );
 }

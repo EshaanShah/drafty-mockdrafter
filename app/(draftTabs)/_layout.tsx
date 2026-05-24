@@ -1,7 +1,17 @@
-import { Tabs } from "expo-router";
+import { Tabs, router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
+import { useEffect } from "react";
+import { useAuth } from "@/contexts/AuthContext";
 
 export default function DraftTabsLayout() {
+    const { isAuthenticated, isAuthReady } = useAuth();
+
+    useEffect(() => {
+        if (isAuthReady && !isAuthenticated) {
+            router.replace("/");
+        }
+    }, [isAuthReady, isAuthenticated]);
+
     return (
         <Tabs
             screenOptions={{

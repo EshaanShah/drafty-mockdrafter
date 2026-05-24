@@ -3,6 +3,7 @@ import {View, Text, SafeAreaView, Animated, TextInput, TouchableOpacity} from 'r
 import ScrollView = Animated.ScrollView;
 import { router } from 'expo-router';
 import { useDraft } from '@/contexts/DraftContext';
+import { useAuth } from '@/contexts/AuthContext';
 
 type SetupLeagueFormat = 'Half PPR' | 'PPR' | 'Standard';
 type SetupDraftOrder = 'Snake' | 'Linear';
@@ -17,6 +18,7 @@ const normalizeLeagueFormat = (format: SetupLeagueFormat) => {
 
 const SetupScreen = () => {
     const { configureDraft } = useDraft();
+    const { isAuthenticated, isAuthReady } = useAuth();
 
     const [selectedTime, setSelectedTime] = useState(60);
     const timeOptions = [30, 45, 60, 75, 90, 120];
@@ -27,11 +29,16 @@ const SetupScreen = () => {
 
 
     useEffect(() => {
+        if (isAuthReady && !isAuthenticated) {
+            router.replace('/');
+            return;
+        }
+
         const teamCount = Math.min(parseInt(numberOfTeams) || 6, 14);
         if (selectedPick >= teamCount && teamCount > 0) {
             setSelectedPick(0); // Reset to first pick if current selection is out of range
         }
-    }, [numberOfTeams, selectedPick]);
+    }, [isAuthReady, isAuthenticated, numberOfTeams, selectedPick]);
 
     const handleStartDrafting = () => {
         const teamCount = Math.min(Math.max(parseInt(numberOfTeams, 10) || 6, 1), 14);
