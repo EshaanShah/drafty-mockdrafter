@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import logging
 from dotenv import load_dotenv
@@ -6,16 +6,14 @@ import os
 
 from schemas import DraftRequest, DraftResponse
 from agent.draft_agent import generate_recommendation
-from agent.output_parser import parse_agent_output
 
 # --------------------
 # Env
 # --------------------
 load_dotenv()
 
-# Optional sanity check
 if not os.getenv("GROQ_API_KEY"):
-    raise RuntimeError("GROQ_API_KEY is not set")
+    logging.warning("GROQ_API_KEY is not set; draft recommendations will use deterministic fallback if Groq fails.")
 
 # --------------------
 # Logging
@@ -54,20 +52,15 @@ def recommend_draft(request: DraftRequest):
         except AttributeError:
             logger.info("DRAFT REQUEST: %s", request.json())
 
-    raw_output = generate_recommendation(request)
+    recommendation = generate_recommendation(request)
 
-    logger.info(f"RAW AGENT OUTPUT: {repr(raw_output)}")
+    logger.info("FINAL AGENT OUTPUT: %s", recommendation.model_dump_json())
 
-    try:
-        return parse_agent_output(
-            raw_text=raw_output,
-            draft_id=request.draft_id
-        )
-    except ValueError as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Agent output parsing failed: {str(e)}"
-        )
+    return DraftResponse(
+        draft_id=recommendation.draft_id,
+        verdict=recommendation.verdict,
+        explanation=recommendation.explanation,
+    )
 
 @app.get("/")
 def root():

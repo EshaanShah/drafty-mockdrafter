@@ -8,6 +8,8 @@ import { useDraft } from '@/contexts/DraftContext';
 import adp from "../../adp_halfPPR.json";
 import { getAvailablePlayersSnapshot, normalizePosition } from '@/utils/draftAi';
 
+const players = adp.body.adpList;
+const BOT_PICK_DELAY_MS = 850;
 
 export default function PlayerScreen() {
     const { id, name, posADP, overallADP, team } = useLocalSearchParams();
@@ -25,10 +27,11 @@ export default function PlayerScreen() {
     const [aiAnalysis, setAiAnalysis] = useState('Loading AI analysis...'); // New state for AI analysis
 
     // Get roster functions
-    const { addPlayer, isPlayerDrafted } = useRoster();
+    const { addPlayer } = useRoster();
     const {
         advancePick,
         recordDraftedPlayer,
+        draftNextAvailablePlayer,
         currentOverallPick,
         round,
         pick,
@@ -56,7 +59,7 @@ export default function PlayerScreen() {
         analysisSnapshotRef.current = {
             key: analysisKey,
             roster,
-            isDraftedAtOpen: isPlayerDrafted(analysisKey),
+            isDraftedAtOpen: draftedPlayerIds.includes(analysisKey),
             playerData: {
                 id: playerId ?? playerName ?? '',
                 name: playerName ?? '',
@@ -77,10 +80,24 @@ export default function PlayerScreen() {
                 leagueFormat,
                 league: `${totalTeams}-team ${leagueFormat}`,
                 draftedPlayerIds,
-                availablePlayers: getAvailablePlayersSnapshot(adp.body.adpList, draftedPlayerIds, 12),
+                availablePlayers: getAvailablePlayersSnapshot(players, draftedPlayerIds, 12),
             },
         };
     }
+
+    useEffect(() => {
+        if (!isBotPickPending) {
+            return;
+        }
+
+        const botPickTimer = setTimeout(() => {
+            draftNextAvailablePlayer(players);
+        }, BOT_PICK_DELAY_MS);
+
+        return () => {
+            clearTimeout(botPickTimer);
+        };
+    }, [currentOverallPick, draftNextAvailablePlayer, isBotPickPending]);
 
     // Generate AI analysis once for the selected player using the page-open draft snapshot.
     useEffect(() => {
@@ -119,7 +136,7 @@ export default function PlayerScreen() {
     }, [analysisKey]);
 
     // Check if this player is already drafted
-    const isDrafted = isPlayerDrafted(playerId ?? playerName ?? '');
+    const isDrafted = draftedPlayerIds.includes(playerId ?? playerName ?? '');
 
     // Handle draft button press
     const handleDraft = (e: any) => {

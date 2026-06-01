@@ -1,4 +1,4 @@
-import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import React, { createContext, useCallback, useContext, useMemo, useRef, useState } from "react";
 
 type LeagueFormat = "PPR" | "Standard" | "Half-PPR";
 type DraftOrder = "Snake" | "Linear";
@@ -9,6 +9,11 @@ type ConfigureDraftOptions = {
     userPickNumber: number;
     leagueFormat: LeagueFormat;
     draftOrder: DraftOrder;
+};
+
+type DraftablePlayer = {
+    playerID?: string | number;
+    longName?: string;
 };
 
 // 1. Define the shape of the context (all the data the draft needs)
@@ -49,12 +54,11 @@ type DraftContextType = {
     tickTimer: () => void;
     advancePick: () => void;
     recordDraftedPlayer: (playerId: string) => void;
+    draftNextAvailablePlayer: (players: DraftablePlayer[]) => string | undefined;
 };
 
 // 2. Create the context
 const DraftContext = createContext<DraftContextType | undefined>(undefined);
-
-const BOT_PICK_DELAY_MS = 850;
 
 const getRoundFromOverallPick = (overallPick: number, totalTeams: number) => {
     const safeTeams = Math.max(totalTeams, 1);
@@ -105,6 +109,7 @@ export const DraftProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const [isTimerRunning, setIsTimerRunning] = useState(false);
     const [isDraftConfigured, setIsDraftConfigured] = useState(false);
     const [draftedPlayerIds, setDraftedPlayerIds] = useState<string[]>([]);
+    const lastBotDraftedOverallPickRef = useRef<number | null>(null);
 
     // Setup state (filled from DraftSetup screen)
     const [totalTeams, setTotalTeams] = useState(6); // will be set in setup
@@ -158,6 +163,36 @@ export const DraftProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         ));
     }, []);
 
+    const draftNextAvailablePlayer = useCallback((players: DraftablePlayer[]) => {
+        if (!isDraftConfigured || isUserTurn || lastBotDraftedOverallPickRef.current === currentOverallPick) {
+            return undefined;
+        }
+
+        const draftedIds = new Set(draftedPlayerIds);
+        const nextPlayer = players.find((player) => {
+            const playerId = String(player.playerID ?? player.longName ?? "");
+            return playerId && !draftedIds.has(playerId);
+        });
+
+        if (!nextPlayer) {
+            return undefined;
+        }
+
+        const nextPlayerId = String(nextPlayer.playerID ?? nextPlayer.longName ?? "");
+        lastBotDraftedOverallPickRef.current = currentOverallPick;
+        recordDraftedPlayer(nextPlayerId);
+        advancePick();
+
+        return nextPlayerId;
+    }, [
+        advancePick,
+        currentOverallPick,
+        draftedPlayerIds,
+        isDraftConfigured,
+        isUserTurn,
+        recordDraftedPlayer,
+    ]);
+
     const tickTimer = useCallback(() => {
         if (!isTimerRunning || !isUserTurn) {
             return;
@@ -178,7 +213,7 @@ export const DraftProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         const safeTotalTeams = Math.max(options.totalTeams, 1);
         const safeUserPickNumber = Math.min(Math.max(options.userPickNumber, 1), safeTotalTeams);
 
-        setCurrentOverallPick(safeUserPickNumber);
+        setCurrentOverallPick(1);
         setTimeLeft(safeTimerDuration);
         setTimerDuration(safeTimerDuration);
         setTotalTeams(safeTotalTeams);
@@ -186,6 +221,7 @@ export const DraftProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         setLeagueFormat(options.leagueFormat);
         setDraftOrder(options.draftOrder);
         setDraftedPlayerIds([]);
+        lastBotDraftedOverallPickRef.current = null;
         setIsTimerRunning(true);
         setIsDraftConfigured(true);
     }, []);
@@ -197,20 +233,6 @@ export const DraftProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const pauseTimer = useCallback(() => {
         setIsTimerRunning(false);
     }, []);
-
-    useEffect(() => {
-        if (!isDraftConfigured || isUserTurn) {
-            return;
-        }
-
-        const botPickTimer = setTimeout(() => {
-            advancePick();
-        }, BOT_PICK_DELAY_MS);
-
-        return () => {
-            clearTimeout(botPickTimer);
-        };
-    }, [advancePick, currentOverallPick, isDraftConfigured, isUserTurn]);
 
     const contextValue = useMemo(
         () => ({
@@ -241,6 +263,7 @@ export const DraftProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             tickTimer,
             advancePick,
             recordDraftedPlayer,
+            draftNextAvailablePlayer,
         }),
         [
             currentOverallPick,
@@ -266,6 +289,7 @@ export const DraftProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             tickTimer,
             advancePick,
             recordDraftedPlayer,
+            draftNextAvailablePlayer,
         ]
     );
 

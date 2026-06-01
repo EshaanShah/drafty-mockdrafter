@@ -14,11 +14,11 @@ interface PlayerCardProps {
 
 const PlayerCard: React.FC<PlayerCardProps> = ({ PlayerId, PlayerName, PlayerPosition, PlayerTeam, OverallADP }) => {
     const router = useRouter();
-    const { addPlayer, isPlayerDrafted } = useRoster();
-    const { advancePick, recordDraftedPlayer, round, pick, isUserTurn } = useDraft();
+    const { addPlayer } = useRoster();
+    const { advancePick, recordDraftedPlayer, round, pick, isUserTurn, draftedPlayerIds } = useDraft();
 
     // Check if this player is already drafted
-    const isDrafted = isPlayerDrafted(PlayerId || PlayerName);
+    const isDrafted = draftedPlayerIds.includes(PlayerId || PlayerName);
 
     // Handle draft button press
     const handleDraft = (e: any) => {

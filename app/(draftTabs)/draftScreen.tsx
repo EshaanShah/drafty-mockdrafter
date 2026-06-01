@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useEffect } from 'react';
 import {
     View,
     Text,
@@ -12,6 +12,7 @@ import { useDraft } from '@/contexts/DraftContext';
 import { useFocusEffect } from '@react-navigation/native';
 
 const players = adp.body.adpList;
+const BOT_PICK_DELAY_MS = 850;
 
 const formatTime = (seconds: number) => {
     const safeSeconds = Math.max(seconds, 0);
@@ -22,7 +23,18 @@ const formatTime = (seconds: number) => {
 };
 
 const DraftScreen = () => {
-    const { round, pick, timeLeft, isBotPickPending, startTimer, pauseTimer, tickTimer } = useDraft();
+    const {
+        round,
+        pick,
+        timeLeft,
+        isBotPickPending,
+        startTimer,
+        pauseTimer,
+        tickTimer,
+        draftNextAvailablePlayer,
+        currentOverallPick,
+        draftedPlayerIds,
+    } = useDraft();
 
     useFocusEffect(
         useCallback(() => {
@@ -38,6 +50,20 @@ const DraftScreen = () => {
             };
         }, [pauseTimer, startTimer, tickTimer])
     );
+
+    useEffect(() => {
+        if (!isBotPickPending) {
+            return;
+        }
+
+        const botPickTimer = setTimeout(() => {
+            draftNextAvailablePlayer(players);
+        }, BOT_PICK_DELAY_MS);
+
+        return () => {
+            clearTimeout(botPickTimer);
+        };
+    }, [currentOverallPick, draftNextAvailablePlayer, isBotPickPending]);
 
     return (
         <View className="flex-1 bg-white">
@@ -70,6 +96,7 @@ const DraftScreen = () => {
             <FlatList
                 className="flex-1"
                 data={players}
+                extraData={draftedPlayerIds}
                 keyExtractor={(item, index) => (item.playerID ? item.playerID.toString() : index.toString())}
                 renderItem={({ item }) => (
                     <PlayerCard
