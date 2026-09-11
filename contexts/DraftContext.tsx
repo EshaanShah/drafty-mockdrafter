@@ -1,7 +1,9 @@
 import React, { createContext, useCallback, useContext, useMemo, useRef, useState } from "react";
+import { ROSTER_SIZE, useRoster } from "@/contexts/RosterContext";
 
 type LeagueFormat = "PPR" | "Standard" | "Half-PPR";
 type DraftOrder = "Snake" | "Linear";
+export type DraftStatus = "idle" | "active" | "complete";
 
 type ConfigureDraftOptions = {
     timerDuration: number;
@@ -20,6 +22,10 @@ type DraftablePlayer = {
 type DraftContextType = {
     // Draft state
     currentOverallPick: number;              // Current overall draft pick cursor
+    status: DraftStatus;                     // Lifecycle state for the current draft
+    isDraftComplete: boolean;                // Whether the final configured pick has been made
+    totalRounds: number;                     // Fixed roster-driven round count
+    totalPicks: number;                      // Total picks across every team
     round: number;                           // Current draft round (starts at 1)
     pick: number;                            // Current pick within the round (starts at 1)
     nextUserPick?: number;                   // Next overall pick owned by the user
@@ -30,6 +36,8 @@ type DraftContextType = {
     timeLeft: number;                        // Countdown timer (seconds left for current pick)
     timerDuration: number;                   // Pick timer duration from setup
     isTimerRunning: boolean;                 // Whether the draft timer should tick
+    isUserPickTimedOut: boolean;             // Whether the current user pick needs auto-draft resolution
+    timeoutError?: string;                   // Why timeout auto-drafting could not complete
 
     // Draft setup info (coming from DraftSetup screen)
     totalTeams: number;                      // How many teams are drafting (e.g. 12)
@@ -48,10 +56,13 @@ type DraftContextType = {
 
     // Draft actions
     configureDraft: (options: ConfigureDraftOptions) => void;
+    resetDraft: () => void;
     startTimer: () => void;
     pauseTimer: () => void;
     resetTimer: () => void;
     tickTimer: () => void;
+    resolveTimedOutUserPick: (playerId: string) => boolean;
+    failTimedOutUserPick: (message: string) => void;
     advancePick: () => void;
     recordDraftedPlayer: (playerId: string) => void;
     draftNextAvailablePlayer: (players: DraftablePlayer[]) => string | undefined;
@@ -82,12 +93,15 @@ const getNextUserPick = (
     currentOverallPick: number,
     totalTeams: number,
     userPickNumber: number,
-    draftOrder: DraftOrder
+    draftOrder: DraftOrder,
+    totalPicks: number
 ) => {
     const safeTeams = Math.max(totalTeams, 1);
     const safeUserPick = Math.min(Math.max(userPickNumber, 1), safeTeams);
 
-    for (let overallPick = currentOverallPick + 1; overallPick <= currentOverallPick + safeTeams * 2; overallPick += 1) {
+    const searchThroughPick = Math.min(currentOverallPick + safeTeams * 2, totalPicks);
+
+    for (let overallPick = currentOverallPick + 1; overallPick <= searchThroughPick; overallPick += 1) {
         const roundForPick = getRoundFromOverallPick(overallPick, safeTeams);
         const pickInRound = getPickInRoundFromOverallPick(overallPick, safeTeams);
         const teamForPick = getTeamOnClock(roundForPick, pickInRound, safeTeams, draftOrder);
@@ -102,14 +116,22 @@ const getNextUserPick = (
 
 // 3. Provider that holds all draft state
 export const DraftProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+    const { resetRoster } = useRoster();
+
     // Core draft state
     const [currentOverallPick, setCurrentOverallPick] = useState(1);
     const [timeLeft, setTimeLeft] = useState(60);
     const [timerDuration, setTimerDuration] = useState(60);
     const [isTimerRunning, setIsTimerRunning] = useState(false);
-    const [isDraftConfigured, setIsDraftConfigured] = useState(false);
+    const [status, setStatus] = useState<DraftStatus>("idle");
     const [draftedPlayerIds, setDraftedPlayerIds] = useState<string[]>([]);
+    const [isUserPickTimedOut, setIsUserPickTimedOut] = useState(false);
+    const [timeoutError, setTimeoutError] = useState<string | undefined>();
     const lastBotDraftedOverallPickRef = useRef<number | null>(null);
+    const timedOutOverallPickRef = useRef<number | null>(null);
+    const isTimerBlockedRef = useRef(false);
+    const currentOverallPickRef = useRef(1);
+    const statusRef = useRef<DraftStatus>("idle");
 
     // Setup state (filled from DraftSetup screen)
     const [totalTeams, setTotalTeams] = useState(6); // will be set in setup
@@ -118,6 +140,9 @@ export const DraftProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
     // League format (default = PPR)
     const [leagueFormat, setLeagueFormat] = useState<LeagueFormat>("PPR");
+    const totalRounds = ROSTER_SIZE;
+    const totalPicks = totalTeams * totalRounds;
+    const isDraftComplete = status === "complete";
 
     const round = useMemo(
         () => getRoundFromOverallPick(currentOverallPick, totalTeams),
@@ -134,24 +159,48 @@ export const DraftProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         [draftOrder, pick, round, totalTeams]
     );
 
-    const isUserTurn = teamOnClock === userPickNumber;
-    const isBotPickPending = !isUserTurn;
+    const isUserTurn = status === "active" && teamOnClock === userPickNumber;
+    const isBotPickPending = status === "active" && !isUserTurn;
 
     const nextUserPick = useMemo(
-        () => getNextUserPick(currentOverallPick, totalTeams, userPickNumber, draftOrder),
-        [currentOverallPick, draftOrder, totalTeams, userPickNumber]
+        () => status === "active"
+            ? getNextUserPick(currentOverallPick, totalTeams, userPickNumber, draftOrder, totalPicks)
+            : undefined,
+        [currentOverallPick, draftOrder, status, totalPicks, totalTeams, userPickNumber]
     );
 
     const picksUntilNextUserPick = nextUserPick ? nextUserPick - currentOverallPick : undefined;
 
     const resetTimer = useCallback(() => {
+        if (statusRef.current !== "active") {
+            return;
+        }
         setTimeLeft(timerDuration);
     }, [timerDuration]);
 
     const advancePick = useCallback(() => {
-        setCurrentOverallPick((currentPick) => currentPick + 1);
+        if (statusRef.current !== "active") {
+            return;
+        }
+
+        timedOutOverallPickRef.current = null;
+        setIsUserPickTimedOut(false);
+        setTimeoutError(undefined);
+
+        if (currentOverallPickRef.current >= totalPicks) {
+            statusRef.current = "complete";
+            isTimerBlockedRef.current = true;
+            setStatus("complete");
+            setIsTimerRunning(false);
+            setTimeLeft(0);
+            return;
+        }
+
+        currentOverallPickRef.current += 1;
+        isTimerBlockedRef.current = false;
+        setCurrentOverallPick(currentOverallPickRef.current);
         setTimeLeft(timerDuration);
-    }, [timerDuration]);
+    }, [timerDuration, totalPicks]);
 
     const recordDraftedPlayer = useCallback((playerId: string) => {
         if (!playerId) {
@@ -164,7 +213,7 @@ export const DraftProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }, []);
 
     const draftNextAvailablePlayer = useCallback((players: DraftablePlayer[]) => {
-        if (!isDraftConfigured || isUserTurn || lastBotDraftedOverallPickRef.current === currentOverallPick) {
+        if (status !== "active" || isUserTurn || lastBotDraftedOverallPickRef.current === currentOverallPick) {
             return undefined;
         }
 
@@ -188,31 +237,75 @@ export const DraftProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         advancePick,
         currentOverallPick,
         draftedPlayerIds,
-        isDraftConfigured,
         isUserTurn,
         recordDraftedPlayer,
+        status,
     ]);
 
     const tickTimer = useCallback(() => {
-        if (!isTimerRunning || !isUserTurn) {
+        if (statusRef.current !== "active" || !isTimerRunning || !isUserTurn) {
             return;
         }
 
         setTimeLeft((currentTime) => {
             if (currentTime <= 1) {
-                advancePick();
-                return timerDuration;
+                timedOutOverallPickRef.current = currentOverallPick;
+                isTimerBlockedRef.current = true;
+                setIsTimerRunning(false);
+                setIsUserPickTimedOut(true);
+                setTimeoutError(undefined);
+                return 0;
             }
 
             return currentTime - 1;
         });
-    }, [advancePick, isTimerRunning, isUserTurn, timerDuration]);
+    }, [currentOverallPick, isTimerRunning, isUserTurn]);
+
+    const resolveTimedOutUserPick = useCallback((playerId: string) => {
+        if (statusRef.current !== "active" || !playerId || timedOutOverallPickRef.current !== currentOverallPick) {
+            return false;
+        }
+
+        timedOutOverallPickRef.current = null;
+        recordDraftedPlayer(playerId);
+        advancePick();
+        return true;
+    }, [advancePick, currentOverallPick, recordDraftedPlayer]);
+
+    const failTimedOutUserPick = useCallback((message: string) => {
+        if (statusRef.current !== "active" || timedOutOverallPickRef.current !== currentOverallPick) {
+            return;
+        }
+
+        timedOutOverallPickRef.current = null;
+        setIsUserPickTimedOut(false);
+        setIsTimerRunning(false);
+        setTimeoutError(message);
+    }, [currentOverallPick]);
+
+    const resetDraft = useCallback(() => {
+        currentOverallPickRef.current = 1;
+        statusRef.current = "idle";
+        setCurrentOverallPick(1);
+        setTimeLeft(timerDuration);
+        setIsTimerRunning(false);
+        setStatus("idle");
+        setDraftedPlayerIds([]);
+        setIsUserPickTimedOut(false);
+        setTimeoutError(undefined);
+        lastBotDraftedOverallPickRef.current = null;
+        timedOutOverallPickRef.current = null;
+        isTimerBlockedRef.current = false;
+    }, [timerDuration]);
 
     const configureDraft = useCallback((options: ConfigureDraftOptions) => {
         const safeTimerDuration = Math.max(options.timerDuration, 1);
         const safeTotalTeams = Math.max(options.totalTeams, 1);
         const safeUserPickNumber = Math.min(Math.max(options.userPickNumber, 1), safeTotalTeams);
 
+        resetRoster();
+        currentOverallPickRef.current = 1;
+        statusRef.current = "active";
         setCurrentOverallPick(1);
         setTimeLeft(safeTimerDuration);
         setTimerDuration(safeTimerDuration);
@@ -221,12 +314,19 @@ export const DraftProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         setLeagueFormat(options.leagueFormat);
         setDraftOrder(options.draftOrder);
         setDraftedPlayerIds([]);
+        setIsUserPickTimedOut(false);
+        setTimeoutError(undefined);
         lastBotDraftedOverallPickRef.current = null;
+        timedOutOverallPickRef.current = null;
+        isTimerBlockedRef.current = false;
         setIsTimerRunning(true);
-        setIsDraftConfigured(true);
-    }, []);
+        setStatus("active");
+    }, [resetRoster]);
 
     const startTimer = useCallback(() => {
+        if (statusRef.current !== "active" || isTimerBlockedRef.current) {
+            return;
+        }
         setIsTimerRunning(true);
     }, []);
 
@@ -237,6 +337,10 @@ export const DraftProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const contextValue = useMemo(
         () => ({
             currentOverallPick,
+            status,
+            isDraftComplete,
+            totalRounds,
+            totalPicks,
             round,
             pick,
             nextUserPick,
@@ -247,6 +351,8 @@ export const DraftProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             timeLeft,
             timerDuration,
             isTimerRunning,
+            isUserPickTimedOut,
+            timeoutError,
             totalTeams,
             userPickNumber,
             draftOrder,
@@ -257,16 +363,23 @@ export const DraftProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             setUserPickNumber,
             setLeagueFormat,
             configureDraft,
+            resetDraft,
             startTimer,
             pauseTimer,
             resetTimer,
             tickTimer,
+            resolveTimedOutUserPick,
+            failTimedOutUserPick,
             advancePick,
             recordDraftedPlayer,
             draftNextAvailablePlayer,
         }),
         [
             currentOverallPick,
+            status,
+            isDraftComplete,
+            totalRounds,
+            totalPicks,
             round,
             pick,
             nextUserPick,
@@ -277,16 +390,21 @@ export const DraftProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             timeLeft,
             timerDuration,
             isTimerRunning,
+            isUserPickTimedOut,
+            timeoutError,
             totalTeams,
             userPickNumber,
             draftOrder,
             draftedPlayerIds,
             leagueFormat,
             configureDraft,
+            resetDraft,
             startTimer,
             pauseTimer,
             resetTimer,
             tickTimer,
+            resolveTimedOutUserPick,
+            failTimedOutUserPick,
             advancePick,
             recordDraftedPlayer,
             draftNextAvailablePlayer,

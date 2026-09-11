@@ -1,5 +1,5 @@
 // contexts/RosterContext.tsx
-import React, { createContext, useContext, useState } from "react";
+import React, { createContext, useCallback, useContext, useState } from "react";
 
 export type Player = {
     id: string;
@@ -18,14 +18,47 @@ export type Player = {
 
 export type Roster = {
     qb: Player | null;
-    rb: Player[];   // max 2
-    wr: Player[];   // max 2
-    te: Player | null;   // ✅ ADDED
-    flex: Player | null; // accepts RB/WR/TE (max 1)
-    dst: Player | null;  // ✅ ADDED
-    k: Player | null;    // ✅ ADDED
-    bench: Player[]; // max 4
+    rb: Player[];
+    wr: Player[];
+    te: Player | null;
+    flex: Player | null;
+    dst: Player | null;
+    k: Player | null;
+    bench: Player[];
 };
+
+export type RosterConfig = Readonly<{
+    qb: number;
+    rb: number;
+    wr: number;
+    te: number;
+    flex: number;
+    dst: number;
+    k: number;
+    bench: number;
+}>;
+
+export const DEFAULT_ROSTER_CONFIG: RosterConfig = Object.freeze({
+    qb: 1,
+    rb: 2,
+    wr: 2,
+    te: 1,
+    flex: 1,
+    dst: 1,
+    k: 1,
+    bench: 4,
+});
+
+export const STARTER_ROSTER_SIZE =
+    DEFAULT_ROSTER_CONFIG.qb +
+    DEFAULT_ROSTER_CONFIG.rb +
+    DEFAULT_ROSTER_CONFIG.wr +
+    DEFAULT_ROSTER_CONFIG.te +
+    DEFAULT_ROSTER_CONFIG.flex +
+    DEFAULT_ROSTER_CONFIG.dst +
+    DEFAULT_ROSTER_CONFIG.k;
+
+export const ROSTER_SIZE = STARTER_ROSTER_SIZE + DEFAULT_ROSTER_CONFIG.bench;
 
 type AddResult = {
     success: boolean;
@@ -34,27 +67,35 @@ type AddResult = {
 
 type RosterContextType = {
     roster: Roster;
+    rosterConfig: RosterConfig;
+    rosterSize: number;
     addPlayer: (player: Player) => AddResult;
+    canAddPlayer: (player: Player) => boolean;
+    resetRoster: () => void;
     removePlayer: (playerId: string) => boolean;
     isPlayerDrafted: (playerId: string) => boolean;
     getRosterStatus: () => { qb: number; rb: number; wr: number; te: number; flex: number; dst: number; k: number; bench: number };
 };
 
-const initialRoster: Roster = {
+const createInitialRoster = (): Roster => ({
     qb: null,
     rb: [],
     wr: [],
-    te: null,    // ✅ ADDED
+    te: null,
     flex: null,
-    dst: null,   // ✅ ADDED
-    k: null,     // ✅ ADDED
+    dst: null,
+    k: null,
     bench: [],
-};
+});
 
 export const RosterContext = createContext<RosterContextType | undefined>(undefined);
 
 export const RosterProvider = ({ children }: { children: React.ReactNode }) => {
-    const [roster, setRoster] = useState<Roster>(initialRoster);
+    const [roster, setRoster] = useState<Roster>(createInitialRoster);
+
+    const resetRoster = useCallback(() => {
+        setRoster(createInitialRoster());
+    }, []);
 
     // Helper function to extract base position from "WR2", "RB15", "QB8", etc.
     const getBasePosition = (position: string): string => {
@@ -72,14 +113,33 @@ export const RosterProvider = ({ children }: { children: React.ReactNode }) => {
 
     const isPlayerInRoster = (playerId: string) => {
         if (roster.qb?.id === playerId) return true;
-        if (roster.te?.id === playerId) return true;  // ✅ ADDED
+        if (roster.te?.id === playerId) return true;
         if (roster.flex?.id === playerId) return true;
-        if (roster.dst?.id === playerId) return true;  // ✅ ADDED
-        if (roster.k?.id === playerId) return true;    // ✅ ADDED
+        if (roster.dst?.id === playerId) return true;
+        if (roster.k?.id === playerId) return true;
         if (roster.rb.some((p) => p.id === playerId)) return true;
         if (roster.wr.some((p) => p.id === playerId)) return true;
         if (roster.bench.some((p) => p.id === playerId)) return true;
         return false;
+    };
+
+    const canAddPlayer = (player: Player) => {
+        if (isPlayerInRoster(player.id)) {
+            return false;
+        }
+
+        const normalizedPos = getBasePosition(player.position);
+        const benchHasSpace = roster.bench.length < DEFAULT_ROSTER_CONFIG.bench;
+
+        if (normalizedPos === "QB") return !roster.qb || benchHasSpace;
+        if (normalizedPos === "RB") return roster.rb.length < DEFAULT_ROSTER_CONFIG.rb || !roster.flex || benchHasSpace;
+        if (normalizedPos === "WR") return roster.wr.length < DEFAULT_ROSTER_CONFIG.wr || !roster.flex || benchHasSpace;
+        if (normalizedPos === "TE") return !roster.te || !roster.flex || benchHasSpace;
+        if (normalizedPos === "DST") return !roster.dst || benchHasSpace;
+        if (normalizedPos === "K") return !roster.k || benchHasSpace;
+        if (normalizedPos === "FLEX") return !roster.flex || benchHasSpace;
+
+        return benchHasSpace;
     };
 
     const addPlayer = (player: Player): AddResult => {
@@ -93,8 +153,7 @@ export const RosterProvider = ({ children }: { children: React.ReactNode }) => {
             return { success: false, message: "Player already on roster" };
         }
 
-        // helper to check bench space
-        const benchHasSpace = (r: Roster) => r.bench.length < 4;
+        const benchHasSpace = (r: Roster) => r.bench.length < DEFAULT_ROSTER_CONFIG.bench;
 
         // update function
         let result: AddResult = { success: false, message: "Unknown error" };
@@ -122,12 +181,16 @@ export const RosterProvider = ({ children }: { children: React.ReactNode }) => {
 
             // RB logic (max 2)
             if (normalizedPos === "RB") {
-                if (next.rb.length < 2) {
+                if (next.rb.length < DEFAULT_ROSTER_CONFIG.rb) {
                     next.rb.push(player);
-                    result = { success: true, message: `Added to RB position (${next.rb.length}/2)` };
+                    result = { success: true, message: `Added to RB position (${next.rb.length}/${DEFAULT_ROSTER_CONFIG.rb})` };
                     return next;
                 }
-                // position full -> bench if possible
+                if (!next.flex) {
+                    next.flex = player;
+                    result = { success: true, message: "RB positions full: added to FLEX" };
+                    return next;
+                }
                 if (benchHasSpace(next)) {
                     next.bench.push(player);
                     result = { success: true, message: "RB positions full: added to bench" };
@@ -139,9 +202,14 @@ export const RosterProvider = ({ children }: { children: React.ReactNode }) => {
 
             // WR logic (max 2)
             if (normalizedPos === "WR") {
-                if (next.wr.length < 2) {
+                if (next.wr.length < DEFAULT_ROSTER_CONFIG.wr) {
                     next.wr.push(player);
-                    result = { success: true, message: `Added to WR position (${next.wr.length}/2)` };
+                    result = { success: true, message: `Added to WR position (${next.wr.length}/${DEFAULT_ROSTER_CONFIG.wr})` };
+                    return next;
+                }
+                if (!next.flex) {
+                    next.flex = player;
+                    result = { success: true, message: "WR positions full: added to FLEX" };
                     return next;
                 }
                 if (benchHasSpace(next)) {
@@ -254,10 +322,10 @@ export const RosterProvider = ({ children }: { children: React.ReactNode }) => {
                     if (p.id === playerId) removed = true;
                     return p.id !== playerId;
                 }),
-                te: prev.te && prev.te.id === playerId ? null : prev.te,  // ✅ ADDED
+                te: prev.te && prev.te.id === playerId ? null : prev.te,
                 flex: prev.flex && prev.flex.id === playerId ? null : prev.flex,
-                dst: prev.dst && prev.dst.id === playerId ? null : prev.dst,  // ✅ ADDED
-                k: prev.k && prev.k.id === playerId ? null : prev.k,  // ✅ ADDED
+                dst: prev.dst && prev.dst.id === playerId ? null : prev.dst,
+                k: prev.k && prev.k.id === playerId ? null : prev.k,
                 bench: prev.bench.filter((p) => {
                     if (p.id === playerId) removed = true;
                     return p.id !== playerId;
@@ -278,16 +346,20 @@ export const RosterProvider = ({ children }: { children: React.ReactNode }) => {
         qb: roster.qb ? 1 : 0,
         rb: roster.rb.length,
         wr: roster.wr.length,
-        te: roster.te ? 1 : 0,   // ✅ ADDED
+        te: roster.te ? 1 : 0,
         flex: roster.flex ? 1 : 0,
-        dst: roster.dst ? 1 : 0,  // ✅ ADDED
-        k: roster.k ? 1 : 0,      // ✅ ADDED
+        dst: roster.dst ? 1 : 0,
+        k: roster.k ? 1 : 0,
         bench: roster.bench.length,
     });
 
     const contextValue: RosterContextType = {
         roster,
+        rosterConfig: DEFAULT_ROSTER_CONFIG,
+        rosterSize: ROSTER_SIZE,
         addPlayer,
+        canAddPlayer,
+        resetRoster,
         removePlayer,
         isPlayerDrafted,
         getRosterStatus,

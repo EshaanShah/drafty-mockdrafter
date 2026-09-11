@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
     View,
     Text,
@@ -10,9 +10,17 @@ import PlayerCard from "@/components/PlayerCard";
 import adp from "../../adp_halfPPR.json";
 import { useDraft } from '@/contexts/DraftContext';
 import { useFocusEffect } from '@react-navigation/native';
+import { Player, useRoster } from '@/contexts/RosterContext';
+import { normalizePosition } from '@/utils/draftAi';
 
 const players = adp.body.adpList;
 const BOT_PICK_DELAY_MS = 850;
+const AUTO_DRAFT_NOTICE_MS = 3000;
+
+const getOverallAdp = (player: (typeof players)[number]) => {
+    const overallAdp = Number(player.overallADP);
+    return Number.isFinite(overallAdp) ? overallAdp : Number.POSITIVE_INFINITY;
+};
 
 const formatTime = (seconds: number) => {
     const safeSeconds = Math.max(seconds, 0);
@@ -23,6 +31,8 @@ const formatTime = (seconds: number) => {
 };
 
 const DraftScreen = () => {
+    const { addPlayer, canAddPlayer } = useRoster();
+    const [autoDraftNotice, setAutoDraftNotice] = useState<string | undefined>();
     const {
         round,
         pick,
@@ -34,6 +44,10 @@ const DraftScreen = () => {
         draftNextAvailablePlayer,
         currentOverallPick,
         draftedPlayerIds,
+        isUserPickTimedOut,
+        timeoutError,
+        resolveTimedOutUserPick,
+        failTimedOutUserPick,
     } = useDraft();
 
     useFocusEffect(
@@ -65,6 +79,88 @@ const DraftScreen = () => {
         };
     }, [currentOverallPick, draftNextAvailablePlayer, isBotPickPending]);
 
+    useEffect(() => {
+        if (!isUserPickTimedOut) {
+            return;
+        }
+
+        const draftedIds = new Set(draftedPlayerIds);
+        const candidate = [...players]
+            .filter((player) => !draftedIds.has(String(player.playerID ?? player.longName)))
+            .sort((left, right) => getOverallAdp(left) - getOverallAdp(right))
+            .map((player): Player => {
+                const normalizedPosition = normalizePosition(player.posADP);
+                const overallAdp = getOverallAdp(player);
+
+                return {
+                    id: String(player.playerID ?? player.longName),
+                    name: player.longName,
+                    position: normalizedPosition.position,
+                    positionRank: normalizedPosition.positionRank,
+                    posADP: player.posADP,
+                    overallADP: Number.isFinite(overallAdp) ? overallAdp : undefined,
+                    team: player.teamAbv,
+                    round,
+                    pick,
+                };
+            })
+            .find(canAddPlayer);
+
+        if (!candidate) {
+            failTimedOutUserPick('No eligible player is available for auto-draft.');
+            return;
+        }
+
+        const result = addPlayer(candidate);
+        if (!result.success) {
+            failTimedOutUserPick(result.message || 'Unable to add an eligible auto-draft player.');
+            return;
+        }
+
+        if (resolveTimedOutUserPick(candidate.id)) {
+            setAutoDraftNotice(`Auto-drafted ${candidate.name}`);
+        }
+    }, [
+        addPlayer,
+        canAddPlayer,
+        draftedPlayerIds,
+        failTimedOutUserPick,
+        isUserPickTimedOut,
+        pick,
+        resolveTimedOutUserPick,
+        round,
+    ]);
+
+    useEffect(() => {
+        if (!autoDraftNotice) {
+            return;
+        }
+
+        const noticeTimer = setTimeout(() => {
+            setAutoDraftNotice(undefined);
+        }, AUTO_DRAFT_NOTICE_MS);
+
+        return () => clearTimeout(noticeTimer);
+    }, [autoDraftNotice]);
+
+    const draftStatusMessage = timeoutError
+        ? timeoutError
+        : autoDraftNotice
+            ? autoDraftNotice
+            : isUserPickTimedOut
+                ? 'Auto-drafting the best available player...'
+                : isBotPickPending
+                    ? 'Bot pick pending...'
+                    : "You're on the clock";
+
+    const draftStatusStyle = timeoutError
+        ? 'bg-red-100 text-red-700'
+        : autoDraftNotice
+            ? 'bg-blue-100 text-blue-700'
+            : isBotPickPending || isUserPickTimedOut
+                ? 'bg-gray-100 text-gray-700'
+                : 'bg-green-100 text-green-700';
+
     return (
         <View className="flex-1 bg-white">
             {/* Header Section */}
@@ -84,11 +180,9 @@ const DraftScreen = () => {
                 </View>
             </View>
             <Text
-                className={`px-4 py-2 font-pingfang-bold ${
-                    isBotPickPending ? 'bg-gray-100 text-gray-700' : 'bg-green-100 text-green-700'
-                }`}
+                className={`px-4 py-2 font-pingfang-bold ${draftStatusStyle}`}
             >
-                {isBotPickPending ? 'Bot pick pending...' : "You're on the clock"}
+                {draftStatusMessage}
             </Text>
             <Text className = "font-pingfang-bold text-red-400 ml-4">*Tap on any player for advanced Stats and AI insights</Text>
 

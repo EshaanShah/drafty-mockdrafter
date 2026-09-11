@@ -1,6 +1,6 @@
 import { Text, View, ScrollView, TouchableOpacity, SafeAreaView } from "react-native";
-import { Player, RosterContext } from '@/contexts/RosterContext';
-import { useContext, useState } from "react";
+import { Player, STARTER_ROSTER_SIZE, useRoster } from '@/contexts/RosterContext';
+import { useState } from "react";
 
 type PositionBadgeProps = {
     position: string;
@@ -43,11 +43,10 @@ const PositionBadge = ({ position }: PositionBadgeProps) => {
             case "D/ST":
             case "K":
                 return `${baseStyle} bg-gray-600`;
-            case "BEN1":
-            case "BEN2":
-                return `${baseStyle} bg-gray-500`;
             default:
-                return `${baseStyle} bg-gray-600`;
+                return position.startsWith("BEN")
+                    ? `${baseStyle} bg-gray-500`
+                    : `${baseStyle} bg-gray-600`;
         }
     };
 
@@ -104,7 +103,7 @@ const SectionHeader = ({ title, count, maxCount }: SectionHeaderProps) => (
 );
 
 export default function Roster() {
-    const { roster } = useContext(RosterContext)!;
+    const { roster, rosterConfig } = useRoster();
     const [currentView, setCurrentView] = useState<ViewMode>('roster');
 
     // Calculate starter count
@@ -166,7 +165,7 @@ export default function Roster() {
 
                 <View className="p-4 pb-20">
                     {/* Starters Section */}
-                    <SectionHeader title="Starters" count={starterCount} maxCount={9} />
+                    <SectionHeader title="Starters" count={starterCount} maxCount={STARTER_ROSTER_SIZE} />
 
                     {/* QB Section */}
                     <PositionHeader title="QUARTERBACK" />
@@ -235,22 +234,20 @@ export default function Roster() {
                     />
 
                     {/* Bench Section */}
-                    <SectionHeader title="Bench" count={roster.bench?.length || 0} maxCount={6} />
+                    <SectionHeader title="Bench" count={roster.bench.length} maxCount={rosterConfig.bench} />
 
-                    {roster.bench.length > 0 ? (
-                        roster.bench.map((player, index) => (
+                    {Array.from({ length: rosterConfig.bench }, (_, index) => {
+                        const player = roster.bench[index];
+
+                        return (
                             <PlayerCard
-                                key={player.id || index}
+                                key={player?.id ?? `empty-bench-${index + 1}`}
                                 player={player}
                                 position={`BEN${index + 1}`}
+                                isEmpty={!player}
                             />
-                        ))
-                    ) : (
-                        <>
-                            <PlayerCard position="BEN1" isEmpty={true} />
-                            <PlayerCard position="BEN2" isEmpty={true} />
-                        </>
-                    )}
+                        );
+                    })}
                 </View>
             </ScrollView>
 

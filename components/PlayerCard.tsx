@@ -15,7 +15,7 @@ interface PlayerCardProps {
 const PlayerCard: React.FC<PlayerCardProps> = ({ PlayerId, PlayerName, PlayerPosition, PlayerTeam, OverallADP }) => {
     const router = useRouter();
     const { addPlayer } = useRoster();
-    const { advancePick, recordDraftedPlayer, round, pick, isUserTurn, draftedPlayerIds } = useDraft();
+    const { advancePick, recordDraftedPlayer, round, pick, isUserTurn, isUserPickTimedOut, draftedPlayerIds } = useDraft();
 
     // Check if this player is already drafted
     const isDrafted = draftedPlayerIds.includes(PlayerId || PlayerName);
@@ -24,7 +24,7 @@ const PlayerCard: React.FC<PlayerCardProps> = ({ PlayerId, PlayerName, PlayerPos
     const handleDraft = (e: any) => {
         e.stopPropagation(); // Prevent the card navigation when pressing draft
 
-        if (!isUserTurn) {
+        if (!isUserTurn || isUserPickTimedOut) {
             Alert.alert('Bot Pick Pending', 'Please wait until your next pick.');
             return;
         }
@@ -91,17 +91,17 @@ const PlayerCard: React.FC<PlayerCardProps> = ({ PlayerId, PlayerName, PlayerPos
                 {/* RIGHT SIDE - Draft Button */}
                 <TouchableOpacity
                     className={`border rounded-md px-4 py-2 ml-4 ${
-                        isDrafted || !isUserTurn
+                        isDrafted || !isUserTurn || isUserPickTimedOut
                             ? 'bg-gray-300 border-gray-400'
                             : 'bg-light border-gray'
                     }`}
                     onPress={handleDraft}
-                    disabled={isDrafted || !isUserTurn} // Disable if already drafted or a bot placeholder pick is active
+                    disabled={isDrafted || !isUserTurn || isUserPickTimedOut}
                 >
                     <Text className={`font-pingfang-bold ${
-                        isDrafted || !isUserTurn ? 'text-gray-500' : 'text-gray-800'
+                        isDrafted || !isUserTurn || isUserPickTimedOut ? 'text-gray-500' : 'text-gray-800'
                     }`}>
-                        {isDrafted ? 'Drafted' : isUserTurn ? 'Draft' : 'Waiting'}
+                        {isDrafted ? 'Drafted' : isUserTurn && !isUserPickTimedOut ? 'Draft' : 'Waiting'}
                     </Text>
                 </TouchableOpacity>
             </View>

@@ -1,15 +1,32 @@
 import React, {useContext, useEffect, useMemo, useRef, useState} from 'react';
-import {View, Text, TouchableOpacity, Image, ScrollView, Alert} from 'react-native';
+import {View, Text, TouchableOpacity, Image, ScrollView, Alert, ActivityIndicator} from 'react-native';
 import {router, useLocalSearchParams} from 'expo-router';
 import {images} from "@/constants";
 import {RosterContext, useRoster} from '@/contexts/RosterContext'; // Import the roster context
-import { generatePlayerAnalysis } from '@/services/aiService'; // Import your API function
+import {
+    generatePlayerAnalysis,
+    type PlayerAnalysisResult,
+    type PlayerAnalysisVerdict,
+} from '@/services/aiService';
 import { useDraft } from '@/contexts/DraftContext';
 import adp from "../../adp_halfPPR.json";
 import { getAvailablePlayersSnapshot, normalizePosition } from '@/utils/draftAi';
 
 const players = adp.body.adpList;
 const BOT_PICK_DELAY_MS = 850;
+
+type AnalysisState =
+    | { status: 'loading' }
+    | { status: 'success'; result: PlayerAnalysisResult }
+    | { status: 'drafted' }
+    | { status: 'unavailable'; message: string };
+
+const VERDICT_PRESENTATION: Record<PlayerAnalysisVerdict, { label: string; containerClass: string; textClass: string }> = {
+    STEAL: { label: 'Steal', containerClass: 'bg-green-500', textClass: 'text-white' },
+    'GOOD VALUE': { label: 'Good Value', containerClass: 'bg-green-500', textClass: 'text-white' },
+    'FAIR VALUE': { label: 'Fair Value', containerClass: 'bg-amber-300', textClass: 'text-amber-950' },
+    REACH: { label: 'Reach', containerClass: 'bg-red-500', textClass: 'text-white' },
+};
 
 export default function PlayerScreen() {
     const { id, name, posADP, overallADP, team } = useLocalSearchParams();
@@ -23,8 +40,8 @@ export default function PlayerScreen() {
         [playerPosADP]
     );
     const { roster } = useContext(RosterContext)!;
-    const [reachStatus, setStatus] = useState('reach');
-    const [aiAnalysis, setAiAnalysis] = useState('Loading AI analysis...'); // New state for AI analysis
+    const [analysisState, setAnalysisState] = useState<AnalysisState>({ status: 'loading' });
+    const analysisRequestRef = useRef(0);
 
     // Get roster functions
     const { addPlayer } = useRoster();
@@ -44,13 +61,14 @@ export default function PlayerScreen() {
         leagueFormat,
         isUserTurn,
         isBotPickPending,
+        isUserPickTimedOut,
         draftedPlayerIds,
     } = useDraft();
 
     const analysisKey = playerId ?? playerName ?? '';
     const analysisSnapshotRef = useRef<{
         key: string;
-        playerData: Record<string, unknown>;
+        playerData: Parameters<typeof generatePlayerAnalysis>[0];
         roster: typeof roster;
         isDraftedAtOpen: boolean;
     } | null>(null);
@@ -99,50 +117,58 @@ export default function PlayerScreen() {
         };
     }, [currentOverallPick, draftNextAvailablePlayer, isBotPickPending]);
 
-    // Generate AI analysis once for the selected player using the page-open draft snapshot.
+    // Check if this player is already drafted
+    const isDrafted = draftedPlayerIds.includes(playerId ?? playerName ?? '');
+
+    // Generate AI analysis for the selected player and discard requests from older screens.
     useEffect(() => {
+        const requestId = analysisRequestRef.current + 1;
+        analysisRequestRef.current = requestId;
+        const controller = new AbortController();
+
         const getAIAnalysis = async () => {
             const snapshot = analysisSnapshotRef.current;
 
             if (!snapshot || !snapshot.key) {
-                setAiAnalysis("Unable to generate analysis. Please try again later.");
+                setAnalysisState({ status: 'unavailable', message: 'AI analysis is unavailable for this player.' });
                 return;
             }
 
-            if (snapshot.isDraftedAtOpen) {
-                setAiAnalysis("This player has already been drafted.");
-                setStatus('reach');
+            if (snapshot.isDraftedAtOpen || isDrafted) {
+                setAnalysisState({ status: 'drafted' });
                 return;
             }
+
+            setAnalysisState({ status: 'loading' });
 
             try {
-                const analysis = await generatePlayerAnalysis(snapshot.playerData, snapshot.roster);
-                setAiAnalysis(analysis);
-
-                // You can also set the reach status based on the analysis
-                if (analysis.includes("Steal") || analysis.includes("Good Value")) {
-                    setStatus('goodValue');
-                } else if (analysis.includes("Fair Value")) {
-                    setStatus('fairValue');
-                } else {
-                    setStatus('reach');
+                const result = await generatePlayerAnalysis(snapshot.playerData, snapshot.roster, controller.signal);
+                if (!controller.signal.aborted && analysisRequestRef.current === requestId) {
+                    setAnalysisState({ status: 'success', result });
                 }
-            } catch {
-                setAiAnalysis("Unable to generate analysis. Please try again later.");
+            } catch (error) {
+                if (!controller.signal.aborted && analysisRequestRef.current === requestId) {
+                    console.error('AI analysis unavailable:', error);
+                    setAnalysisState({
+                        status: 'unavailable',
+                        message: 'AI analysis is temporarily unavailable. You can still draft this player.',
+                    });
+                }
             }
         };
 
         getAIAnalysis();
-    }, [analysisKey]);
 
-    // Check if this player is already drafted
-    const isDrafted = draftedPlayerIds.includes(playerId ?? playerName ?? '');
+        return () => {
+            controller.abort();
+        };
+    }, [analysisKey, isDrafted]);
 
     // Handle draft button press
     const handleDraft = (e: any) => {
         e.stopPropagation(); // Prevent the card navigation when pressing draft
 
-        if (!isUserTurn) {
+        if (!isUserTurn || isUserPickTimedOut) {
             Alert.alert('Bot Pick Pending', 'Please wait until your next pick.');
             return;
         }
@@ -270,29 +296,51 @@ export default function PlayerScreen() {
                             />
                             <Text className=" ml-2 font-pingfang-bold text-xl ">AI Expert Summary</Text>
                         </View>
-                        <Text className= 'p-4 font-pingfang'>
-                            {aiAnalysis}
-                        </Text>
+                        {analysisState.status === 'loading' && (
+                            <View className="flex-row items-center p-4">
+                                <ActivityIndicator color="#4b5563" />
+                                <Text className="ml-3 font-pingfang text-gray-600">Analyzing this pick…</Text>
+                            </View>
+                        )}
+                        {analysisState.status === 'success' && (
+                            <Text className="p-4 font-pingfang">{analysisState.result.explanation}</Text>
+                        )}
+                        {analysisState.status === 'drafted' && (
+                            <Text className="p-4 font-pingfang text-gray-600">
+                                This player has already been drafted, so a pick verdict is no longer available.
+                            </Text>
+                        )}
+                        {analysisState.status === 'unavailable' && (
+                            <Text className="p-4 font-pingfang text-gray-600">{analysisState.message}</Text>
+                        )}
                     </View>
 
                 </View>
 
-                <View className ={`flex-1 justify-center rounded-xl items-center mt-8 mx-10 w-96 p-4 ${reachStatus === 'reach' ? 'bg-red-300 text-white' : reachStatus === 'goodValue' ? 'bg-green-500 text-white'  : 'bg-white text-black'}  `}  >
-                    <Text className="text-lg font-pingfang-bold">Reach pick based on your roster, league settings, and who is on the board  </Text>
-                </View>
+                {analysisState.status === 'success' && (() => {
+                    const verdict = VERDICT_PRESENTATION[analysisState.result.verdict];
+                    return (
+                        <View className={`flex-1 justify-center rounded-xl items-center mt-8 mx-10 w-96 p-4 ${verdict.containerClass}`}>
+                            <Text className={`text-xl font-pingfang-bold ${verdict.textClass}`}>{verdict.label}</Text>
+                            <Text className={`mt-1 text-center font-pingfang ${verdict.textClass}`}>
+                                Based on your roster, league settings, and the available board.
+                            </Text>
+                        </View>
+                    );
+                })()}
                 <TouchableOpacity
                     className={`items-center justify-center mx-10 mb-7 w-96 mt-6 border-light p-6 border-2 ${
-                        isDrafted || isBotPickPending
+                        isDrafted || isBotPickPending || isUserPickTimedOut
                             ? 'bg-gray-300 border-gray-400'
                             : 'bg-light border-gray'
                     }`}
                     onPress={handleDraft}
-                    disabled={isDrafted || isBotPickPending} // Disable if already drafted or a bot placeholder pick is active
+                    disabled={isDrafted || isBotPickPending || isUserPickTimedOut}
                 >
                     <Text className={`font-pingfang-bold ${
-                        isDrafted || isBotPickPending ? 'text-gray-500' : 'text-gray-800'
+                        isDrafted || isBotPickPending || isUserPickTimedOut ? 'text-gray-500' : 'text-gray-800'
                     }`}>
-                        {isDrafted ? 'Drafted' : isBotPickPending ? 'Waiting' : 'Draft'}
+                        {isDrafted ? 'Drafted' : isBotPickPending || isUserPickTimedOut ? 'Waiting' : 'Draft'}
                     </Text>
                 </TouchableOpacity>
 
