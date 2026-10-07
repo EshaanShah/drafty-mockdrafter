@@ -79,7 +79,8 @@ Current repository checks:
 
 ```sh
 npm run lint
-npx tsc --noEmit
+npm run typecheck
+npm run export:web
 .venv/bin/python -m pytest tests
 ```
 

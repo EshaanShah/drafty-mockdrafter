@@ -64,7 +64,8 @@ Run the narrowest relevant checks while developing, then run all checks supporte
 
 ```sh
 npm run lint
-npx tsc --noEmit
+npm run typecheck
+npm run export:web
 .venv/bin/python -m pytest tests
 ```
 
