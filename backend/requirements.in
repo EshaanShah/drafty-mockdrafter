@@ -1,0 +1,7 @@
+# Direct production dependencies for the FastAPI recommendation service.
+fastapi==0.128.0
+langchain-core==1.2.7
+langchain-groq==1.1.1
+pydantic==2.12.5
+python-dotenv==1.1.1
+uvicorn==0.40.0

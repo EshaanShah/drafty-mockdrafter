@@ -3,7 +3,7 @@ import React from 'react'
 interface MenuButtonProps {
     title: string;
     variant?: 'light' | 'dark';
-    onPress?: () => void;
+    onPress: () => void;
 
 }
 const MenuButton: React.FC<MenuButtonProps> = ({title,onPress, variant = 'light'}) => {

@@ -210,79 +210,30 @@ export default function PlayerScreen() {
                     <Text className="text-blue-500 text-lg">←</Text>
                 </TouchableOpacity>
 
-                <Text className="text-lg font-pingfang-bold text-black">INFO</Text>
+                <Text className="text-lg font-pingfang-bold text-black">PLAYER INFO</Text>
 
-                <TouchableOpacity className="p-1">
-                    <Text className="text-gray-400 text-lg">⋯</Text>
-                </TouchableOpacity>
+                <View className="w-7" />
                  </View>
 
             <ScrollView className="flex-1">
                 <View className="mx-4 rounded-lg px-4 ">
                     <View className="flex-row items-center">
                         <View className="w-16 h-16 bg-gray-300 rounded-full mr-3 items-center justify-center">
-                            <Text className="text-white font-bold text-xs">LOGO</Text>
+                            <Text className="text-white font-bold text-xs">
+                                {normalizedPlayerPosition.position || "N/A"}
+                            </Text>
                         </View>
                         {/* Player Info */}
                         <View className="flex-1">
                             <Text className="text-black text-xl font-pingfang-bold">
-                                {playerName || "Player Name"}
+                                {playerName || "Player unavailable"}
                             </Text>
                             <Text className="text-gray-600 font-pingfang">
-                                {playerPosADP || "QB"} – {playerTeam || "Team"}
+                                {playerPosADP || "Rank unavailable"} – {playerTeam || "Team unavailable"}
                             </Text>
                             <Text className="text-gray-500 text-sm font-pingfang">
-                                Age Unknown
+                                Overall ADP: {playerOverallADP || "Unavailable"}
                             </Text>
-                        </View>
-                    </View>
-                </View>
-                <View className="flex-1 justify-center items-center mt-5">
-                    <View className="flex-1 bg-light rounded-lg p-4 w-96">
-                        <Text className="font-pingfang-bold text-xl ">2024 Season Stats</Text>
-                        <View className="flex-row justify-between mb-4 p-4 items-center ml-8 ">
-
-                            <View className = "item-center flex-1">
-                                <Text className="font-pingfang-bold text-lg ">15.1 </Text>
-                                <Text>PPG</Text>
-
-                            </View>
-
-                            <View className = "item-center flex-1">
-                                <Text className="font-pingfang-bold text-lg ">256.6 </Text>
-                                <Text>PPG</Text>
-
-                            </View>
-                        </View>
-
-                        <View className="flex-row justify-between mb-4 p-4 items-center ml-8 ">
-
-                            <View className = "item-center flex-1">
-                                <Text className="font-pingfang-bold text-lg ">17</Text>
-                                <Text>Games Played</Text>
-
-                            </View>
-
-                            <View className = "item-center flex-1">
-                                <Text className="font-pingfang-bold text-lg ">{playerOverallADP || "N/A"} </Text>
-                                <Text>ADP</Text>
-
-                            </View>
-                        </View>
-
-                    </View>
-                    <View className = "flex-1 bg-white border-2 rounded-lg p-4 w-96 mt-8 border-light outline-offset-4">
-                        <Text className = "font-pingfang-bold text-xl ">2025 Projections</Text>
-                        <View className = "flex-row p-4 mx-4">
-                            <View className = "flex-1">
-                                <Text className = "font-pingfang-bold text-lg">15.1</Text>
-                                <Text>PPG</Text>
-                            </View>
-                            <View className = "flex-1">
-                                <Text className="font-pingfang-bold text-lg">256.6</Text>
-                                <Text>Total Points</Text>
-
-                            </View>
                         </View>
                     </View>
                 </View>

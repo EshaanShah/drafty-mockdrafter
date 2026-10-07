@@ -197,7 +197,7 @@ const DraftScreen = () => {
                         PlayerId={item.playerID?.toString() ?? item.longName}
                         PlayerName={item.longName}
                         PlayerPosition={item.posADP}
-                        PlayerTeam={item.teamAbv ?? "Unknown"}
+                        PlayerTeam={item.teamAbv ?? "Team unavailable"}
                         OverallADP={item.overallADP}
                     />
                 )}

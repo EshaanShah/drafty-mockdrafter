@@ -43,16 +43,6 @@ export default function Home() {
                     title="START SOLO DRAFT"
                     onPress={() => router.push("/setupScreen")}
                 />
-                <MenuButton
-                    title="JOIN ROOM"
-                    variant="dark"
-                    onPress={() => {}}
-                />
-
-                <MenuButton
-                    title="TALK TO AI AGENT"
-                    onPress={() => {}}
-                />
             </View>
         </SafeAreaView>
     );
