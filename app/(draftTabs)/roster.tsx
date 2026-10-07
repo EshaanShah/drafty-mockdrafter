@@ -1,6 +1,6 @@
-import { Text, View, ScrollView, TouchableOpacity, SafeAreaView } from "react-native";
+import { Text, View, ScrollView, SafeAreaView } from "react-native";
 import { Player, STARTER_ROSTER_SIZE, useRoster } from '@/contexts/RosterContext';
-import { useState } from "react";
+import { useDraft } from '@/contexts/DraftContext';
 
 type PositionBadgeProps = {
     position: string;
@@ -26,7 +26,6 @@ type SectionHeaderProps = HeaderProps & {
 };
 
 type StarterPosition = 'qb' | 'rb' | 'wr' | 'te' | 'flex' | 'dst' | 'k';
-type ViewMode = 'roster' | 'draft';
 
 const PositionBadge = ({ position }: PositionBadgeProps) => {
     const getPositionStyle = () => {
@@ -70,7 +69,7 @@ const PlayerCard = ({ player, position, isEmpty = false }: PlayerCardProps) => {
     }
 
     return (
-        <TouchableOpacity className="flex-row items-center bg-white p-3 mb-2 rounded-lg border border-gray-200 shadow-sm">
+        <View className="flex-row items-center bg-white p-3 mb-2 rounded-lg border border-gray-200 shadow-sm">
             <PositionBadge position={position} />
             <View className="ml-3 flex-1">
                 <Text className="font-pingfang-bold text-gray-900 text-base">{player.name}</Text>
@@ -83,7 +82,7 @@ const PlayerCard = ({ player, position, isEmpty = false }: PlayerCardProps) => {
                     <Text className="text-yellow-400 text-lg">★</Text>
                 </View>
             )}
-        </TouchableOpacity>
+        </View>
     );
 };
 
@@ -104,7 +103,7 @@ const SectionHeader = ({ title, count, maxCount }: SectionHeaderProps) => (
 
 export default function Roster() {
     const { roster, rosterConfig } = useRoster();
-    const [currentView, setCurrentView] = useState<ViewMode>('roster');
+    const { currentOverallPick, round } = useDraft();
 
     // Calculate starter count
     const starterPositions: StarterPosition[] = ['qb', 'rb', 'wr', 'te', 'flex', 'dst', 'k'];
@@ -115,37 +114,6 @@ export default function Roster() {
         return count + (roster[pos] ? 1 : 0);
     }, 0);
 
-    if (currentView === 'draft') {
-        return (
-            <SafeAreaView className="flex-1 bg-gray-50">
-                <View className="flex-1 justify-center items-center">
-                    <Text className="text-xl font-pingfang-bold text-gray-900">Draft View</Text>
-                    <Text className="text-gray-600 font-pingfang mt-2">Draft interface coming soon...</Text>
-                </View>
-
-                {/* Bottom Navigation */}
-                <View className="bg-white border-t border-gray-200 px-4 py-2 flex-row">
-                    <TouchableOpacity
-                        className="flex-1 py-3 rounded-lg mr-2 bg-blue-500"
-                        onPress={() => setCurrentView('draft')}
-                    >
-                        <Text className="text-center font-pingfang-bold text-white">
-                            Draft
-                        </Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                        className="flex-1 py-3 rounded-lg ml-2 bg-gray-100"
-                        onPress={() => setCurrentView('roster')}
-                    >
-                        <Text className="text-center font-pingfang-bold text-gray-700">
-                            Roster
-                        </Text>
-                    </TouchableOpacity>
-                </View>
-            </SafeAreaView>
-        );
-    }
-
     return (
         <SafeAreaView className="flex-1 bg-gray-50">
             <ScrollView className="flex-1">
@@ -154,12 +122,10 @@ export default function Roster() {
                     <View className="flex-row items-center justify-between">
                         <View>
                             <Text className="text-2xl font-pingfang-bold text-gray-900">My Roster</Text>
-                            <Text className="text-gray-600 font-pingfang">Round 8 • 15 picks made</Text>
+                            <Text className="text-gray-600 font-pingfang">
+                                Round {round} • {Math.max(currentOverallPick - 1, 0)} picks made
+                            </Text>
                         </View>
-                        <TouchableOpacity className="bg-gray-100 px-3 py-1 rounded flex-row items-center">
-                            <Text className="text-gray-700 mr-1">📊</Text>
-                            <Text className="text-gray-700 font-pingfang">Summary</Text>
-                        </TouchableOpacity>
                     </View>
                 </View>
 
@@ -251,25 +217,6 @@ export default function Roster() {
                 </View>
             </ScrollView>
 
-            {/* Bottom Navigation */}
-            <View className="bg-white border-t border-gray-200 px-4 py-2 flex-row">
-                <TouchableOpacity
-                    className="flex-1 py-3 rounded-lg mr-2 bg-gray-100"
-                    onPress={() => setCurrentView('draft')}
-                >
-                    <Text className="text-center font-pingfang-bold text-gray-700">
-                        Draft
-                    </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                    className="flex-1 py-3 rounded-lg ml-2 bg-blue-500"
-                    onPress={() => setCurrentView('roster')}
-                >
-                    <Text className="text-center font-pingfang-bold text-white">
-                        Roster
-                    </Text>
-                </TouchableOpacity>
-            </View>
         </SafeAreaView>
     );
 }

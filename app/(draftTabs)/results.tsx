@@ -106,8 +106,6 @@ export default function DraftResultsScreen() {
                     </Text>
                 </View>
 
-                {/* Future end-of-draft grade summary can be inserted here. */}
-
                 <View className="mb-3 mt-8 flex-row items-center justify-between">
                     <Text className="text-xl font-pingfang-bold text-gray-900">Your Roster</Text>
                     <Text className="font-pingfang text-gray-500">{filledSlots}/{rosterSize}</Text>

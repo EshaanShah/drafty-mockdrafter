@@ -1,127 +1,106 @@
-# Drafty — AI Fantasy Football Mock Drafter
+# Drafty
 
-Drafty is a cross-platform fantasy football mock drafting app that helps users simulate draft strategies across different league formats using real-time data and AI-assisted analytics.
+Drafty is an iOS fantasy-football mock-drafting app for practicing complete solo drafts and receiving contextual AI guidance on individual picks.
 
-The app allows fantasy football players to test draft positions, evaluate pick strategies, and gain confidence before live drafts.
+## Production launch scope
 
-**Status:** MVP complete. Actively upgrading AI analytics with an agent-based backend. Fixing minor bugs and improving UI.
+The first production release is deliberately focused:
 
----
+- iOS distribution.
+- Required account creation and sign-in.
+- Solo drafts against automated opponents.
+- PPR and Half PPR ranking formats.
+- Snake and linear draft orders.
+- Configurable league size, draft slot, and pick timer.
+- Live draft board, roster tracking, timeout auto-picks, and final results.
+- Embedded AI verdicts and explanations for available players. AI failure never blocks drafting.
+- Deterministically sourced player identity and ranking data, refreshed at least daily during draft season.
 
-## Features
+The canonical product boundary and release acceptance criteria are in [`docs/production-launch-scope.md`](docs/production-launch-scope.md).
 
-- 🏈 Mock drafts across multiple fantasy football league formats  
-- 🤖 AI-assisted draft insights and analytics  
-- 📊 Real-time player data ingestion (ADP, rankings, performance trends)  
-- 📱 Cross-platform mobile experience (iOS & Android)  
-- 🎯 Strategy testing to evaluate draft paths and pick decisions  
+## Not in the first release
 
----
+- Multiplayer rooms.
+- Standalone AI chat.
+- Android or web production distribution.
+- Standard-scoring drafts.
+- Roster summaries and end-of-draft grading.
 
-## Tech Stack
+These are backlog candidates, not promised features or dated commitments. Production UI and marketing must not present them as available or "coming soon."
 
-### Frontend
+## Tech stack
 
-- React Native  
-- Expo Router  
-- TypeScript  
-- NativeWind / Tailwind CSS  
+### Mobile client
 
-### Backend & AI
+- React Native and Expo Router
+- TypeScript
+- NativeWind / Tailwind CSS
+- AWS Amplify authentication
 
-- Python  
-- FastAPI (API layer for draft recommendations)  
-- Pydantic (strict request/response schemas)  
-- LangChain (agent-based reasoning framework)  
-- Groq LLM (low-latency inference for draft analysis)  
-- JSON-based APIs for live player and ranking data  
+### Recommendation service
 
----
+- Python and FastAPI
+- Pydantic request and response contracts
+- LangChain with Groq inference
+- Deterministic draft-analysis helpers and bounded tool inputs
 
-## Architecture Highlights (New)
+## Architecture principles
 
-Drafty’s AI system is being upgraded from a single-shot prompt model to a policy-driven agent architecture:
+- Draft rules and factual data remain separate from model-generated analysis.
+- Player facts must come from typed, validated sources; the AI may not invent ADP, injuries, trends, or statistics.
+- Recommendation responses use a strict verdict-and-explanation contract.
+- AI is advisory and fail-open so the core draft remains usable during provider failures.
+- Ranking snapshots carry format, season, source, and retrieval metadata and retain the last valid data when refresh fails.
 
-- **Policy-first prompting:**  
-  Reasoning rules (Tier 1 / Tier 2 / Tier 3 logic) are defined separately from factual data.
+## Local development
 
-- **Strict anti-hallucination design:**  
-  The agent is forbidden from inventing ADP, injury status, or trends.  
-  All factual inputs will be provided via tools (currently stubbed).
+Install frontend dependencies and run Expo:
 
-- **Schema-enforced contracts:**  
-  DraftRequest and DraftResponse models enforce structure and prevent invalid or ambiguous inputs.
+```sh
+npm install
+npm start
+```
 
-- **Future-proof agent flow:**  
-  Designed to safely integrate real tools (ADP lookup, roster-fit analysis, risk evaluation) without changing reasoning logic.
+The backend uses Python 3.13.7, recorded in `.python-version`. From a clean checkout, create the environment and install the locked development dependencies:
 
-This approach prioritizes correctness, explainability, and long-term maintainability over quick prompt hacks.
+```sh
+python3.13 -m venv .venv
+.venv/bin/python -m pip install --upgrade pip==25.2
+.venv/bin/python -m pip install --require-hashes -r backend/requirements-dev.txt
+```
 
----
+Run the API from the repository root:
 
-## Current Status
+```sh
+.venv/bin/python -m uvicorn main:app --app-dir backend --reload
+```
 
-- ✅ Core mock draft engine implemented  
-- ✅ End-to-end draft simulation flow complete  
-- ✅ FastAPI backend integrated  
-- ✅ Draft recommendation schemas finalized  
-- ✅ Policy-based AI reasoning implemented  
-- ✅ Groq-backed LLM wired via LangChain  
-- ✅ Tool-calling behavior validated (tool execution coming next)  
-- ✅ Reusable, responsive UI components built  
+Current repository checks:
 
----
+```sh
+npm run lint
+npx tsc --noEmit
+.venv/bin/python -m pytest tests
+```
 
-## 🔧 Currently Working On
+`backend/requirements.in` and `backend/requirements-dev.in` contain the direct dependencies. Their corresponding `.txt` files are fully resolved lockfiles. After intentionally changing an input dependency, regenerate both locks with pip-tools 7.5.2 under Python 3.13.7:
 
-- Completing tool execution loop for AI agent (ADP, roster fit, risk stubs → real data)  
-- Improving AI draft recommendation depth and consistency  
-- Refining verdict logic and contextual draft feedback  
-- Minor UI and UX improvements  
+```sh
+.venv/bin/python -m pip install pip-tools==7.5.2
+.venv/bin/pip-compile --generate-hashes --output-file=backend/requirements.txt backend/requirements.in
+.venv/bin/pip-compile --generate-hashes --output-file=backend/requirements-dev.txt backend/requirements-dev.in
+```
 
-The application is fully functional end-to-end.  
-Current work focuses on analytical depth and correctness, not core functionality.
+Environment-specific values belong in ignored environment files. Never commit secrets or embed private keys in the mobile client.
 
----
+## Project status
 
-## Demo
-
-Product demos and walkthroughs are available on my LinkedIn profile, including:
-
-- Full mock draft flows  
-- AI-driven draft insights  
-- Live UI interactions  
-
-👉 **LinkedIn:**  
-https://www.linkedin.com/posts/eshaan-shah0_when-i-first-started-playing-fantasy-football-activity-7391835707948048384-Oblu
-
----
-
-## Planned Release
-
-**Target launch:** Summer (pre–NFL season)
-
-**Reason:**  
-Aligning release with peak fantasy football engagement for maximum demand and user adoption.
-
----
-
-## Motivation
-
-Drafty was built to address a gap in existing fantasy football tools — the lack of flexible mock drafting platforms that allow users to meaningfully test strategy and draft decision-making.
-
-The project emphasizes:
-
-- practical data modeling  
-- user-centered product design  
-- responsible, production-grade application of AI  
-
----
+Drafty is pre-production. Core draft flows exist, while the launch backlog covers data ingestion and freshness, environment hardening, backend deployment, observability, sourced player details, accessibility, beta validation, and App Store readiness. A feature is not considered production-ready until it satisfies the acceptance criteria in the launch scope.
 
 ## Author
 
-**Eshaan Shah**  
-Computer Science & Statistics @ University of Virginia  
+Eshaan Shah
+Computer Science & Statistics, University of Virginia
 
-- **GitHub:** https://github.com/EshaanShah  
-- **LinkedIn:** https://www.linkedin.com/in/Eshaan-Shah0
+- [GitHub](https://github.com/EshaanShah)
+- [LinkedIn](https://www.linkedin.com/in/Eshaan-Shah0)

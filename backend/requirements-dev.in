@@ -1,0 +1,7 @@
+-r requirements.in
+
+# Backend test suite.
+pytest==9.0.3
+
+# Required by the legacy ADP fetch script until issue #3 moves it out of test discovery.
+requests==2.34.2
