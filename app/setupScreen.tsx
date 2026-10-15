@@ -31,14 +31,15 @@ const SetupScreen = () => {
     useEffect(() => {
         if (isAuthReady && !isAuthenticated) {
             router.replace('/');
-            return;
         }
+    }, [isAuthReady, isAuthenticated]);
 
-        const teamCount = Math.min(parseInt(numberOfTeams) || 6, 14);
-        if (selectedPick >= teamCount && teamCount > 0) {
-            setSelectedPick(0); // Reset to first pick if current selection is out of range
-        }
-    }, [isAuthReady, isAuthenticated, numberOfTeams, selectedPick]);
+    const handleNumberOfTeamsChange = (value: string) => {
+        setNumberOfTeams(value);
+
+        const teamCount = Math.min(parseInt(value, 10) || 6, 14);
+        setSelectedPick((currentPick) => currentPick >= teamCount ? 0 : currentPick);
+    };
 
     const handleStartDrafting = () => {
         const teamCount = Math.min(Math.max(parseInt(numberOfTeams, 10) || 6, 1), 14);
@@ -109,7 +110,7 @@ const SetupScreen = () => {
                     placeholder="Please Input"
                     placeholderTextColor="#9CA3AF"
                     value={numberOfTeams}
-                    onChangeText={setNumberOfTeams}
+                    onChangeText={handleNumberOfTeamsChange}
                     keyboardType="numeric"
                     returnKeyType="done">
 

@@ -15,6 +15,14 @@ import { getAvailablePlayersSnapshot, normalizePosition } from '@/utils/draftAi'
 const players = adp.body.adpList;
 const BOT_PICK_DELAY_MS = 850;
 
+type PlayerScreenContentProps = {
+    playerId?: string;
+    playerName?: string;
+    playerPosADP?: string;
+    playerOverallADP?: string;
+    playerTeam?: string;
+};
+
 type AnalysisState =
     | { status: 'loading' }
     | { status: 'success'; result: PlayerAnalysisResult }
@@ -35,6 +43,27 @@ export default function PlayerScreen() {
     const playerPosADP = Array.isArray(posADP) ? posADP[0] : posADP;
     const playerOverallADP = Array.isArray(overallADP) ? overallADP[0] : overallADP;
     const playerTeam = Array.isArray(team) ? team[0] : team;
+    const analysisKey = playerId ?? playerName ?? '';
+
+    return (
+        <PlayerScreenContent
+            key={analysisKey}
+            playerId={playerId}
+            playerName={playerName}
+            playerPosADP={playerPosADP}
+            playerOverallADP={playerOverallADP}
+            playerTeam={playerTeam}
+        />
+    );
+}
+
+function PlayerScreenContent({
+    playerId,
+    playerName,
+    playerPosADP,
+    playerOverallADP,
+    playerTeam,
+}: PlayerScreenContentProps) {
     const normalizedPlayerPosition = useMemo(
         () => normalizePosition(playerPosADP),
         [playerPosADP]
@@ -66,15 +95,7 @@ export default function PlayerScreen() {
     } = useDraft();
 
     const analysisKey = playerId ?? playerName ?? '';
-    const analysisSnapshotRef = useRef<{
-        key: string;
-        playerData: Parameters<typeof generatePlayerAnalysis>[0];
-        roster: typeof roster;
-        isDraftedAtOpen: boolean;
-    } | null>(null);
-
-    if (!analysisSnapshotRef.current || analysisSnapshotRef.current.key !== analysisKey) {
-        analysisSnapshotRef.current = {
+    const [analysisSnapshot] = useState(() => ({
             key: analysisKey,
             roster,
             isDraftedAtOpen: draftedPlayerIds.includes(analysisKey),
@@ -100,8 +121,7 @@ export default function PlayerScreen() {
                 draftedPlayerIds,
                 availablePlayers: getAvailablePlayersSnapshot(players, draftedPlayerIds, 12),
             },
-        };
-    }
+        }));
 
     useEffect(() => {
         if (!isBotPickPending) {
@@ -127,7 +147,7 @@ export default function PlayerScreen() {
         const controller = new AbortController();
 
         const getAIAnalysis = async () => {
-            const snapshot = analysisSnapshotRef.current;
+            const snapshot = analysisSnapshot;
 
             if (!snapshot || !snapshot.key) {
                 setAnalysisState({ status: 'unavailable', message: 'AI analysis is unavailable for this player.' });
@@ -162,7 +182,7 @@ export default function PlayerScreen() {
         return () => {
             controller.abort();
         };
-    }, [analysisKey, isDrafted]);
+    }, [analysisKey, analysisSnapshot, isDrafted]);
 
     // Handle draft button press
     const handleDraft = (e: any) => {
