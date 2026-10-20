@@ -9,7 +9,7 @@ import {images} from "@/constants";
 import PlayerCard from "@/components/PlayerCard";
 import adp from "../../adp_halfPPR.json";
 import { useDraft } from '@/contexts/DraftContext';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect } from 'expo-router';
 import { Player, useRoster } from '@/contexts/RosterContext';
 import { normalizePosition } from '@/utils/draftAi';
 
@@ -118,7 +118,9 @@ const DraftScreen = () => {
         }
 
         if (resolveTimedOutUserPick(candidate.id)) {
-            setAutoDraftNotice(`Auto-drafted ${candidate.name}`);
+            setTimeout(() => {
+                setAutoDraftNotice(`Auto-drafted ${candidate.name}`);
+            }, 0);
         }
     }, [
         addPlayer,

@@ -54,12 +54,15 @@ These are backlog candidates, not promised features or dated commitments. Produc
 
 ## Local development
 
-Install frontend dependencies and run Expo:
+The frontend uses Expo SDK 57 and Node 22.13.0, recorded in `.nvmrc`. Select that Node version, install dependencies, and run Expo:
 
 ```sh
+nvm use
 npm install
 npm start
 ```
+
+Compatibility decisions and migration notes for the current Expo baseline are recorded in [`docs/expo-sdk-57-upgrade.md`](docs/expo-sdk-57-upgrade.md).
 
 The backend uses Python 3.13.7, recorded in `.python-version`. From a clean checkout, create the environment and install the locked development dependencies:
 
@@ -80,6 +83,8 @@ Current repository checks:
 ```sh
 npm run lint
 npm run typecheck
+npm run export:ios
+npm run export:android
 npm run export:web
 .venv/bin/python -m pytest tests
 ```
