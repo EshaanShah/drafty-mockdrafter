@@ -39,10 +39,18 @@ jobs:
       - name: Type-check
         run: npm run typecheck
 
+      - name: Test environment validation
+        run: npm run test:environment
+
       - name: Export Expo web build
         run: npm run export:web
         env:
           CI: "true"
+          EXPO_PUBLIC_APP_ENV: development
+          EXPO_PUBLIC_BACKEND_URL: http://localhost:8000
+          EXPO_PUBLIC_AWS_REGION: us-east-1
+          EXPO_PUBLIC_COGNITO_USER_POOL_ID: us-east-1_ci
+          EXPO_PUBLIC_COGNITO_USER_POOL_CLIENT_ID: ciclientid
 
       - name: Verify export output
         run: test -f dist/index.html

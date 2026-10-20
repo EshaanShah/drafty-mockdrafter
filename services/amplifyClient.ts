@@ -1,9 +1,10 @@
 import { Amplify } from 'aws-amplify';
+import { publicEnvironment } from '@/config/environment';
 
 export const cognitoConfig = {
-    region: 'us-east-1',
-    userPoolId: 'us-east-1_EBo3Vwb8X',
-    userPoolClientId: '3qlmbv7qrr9kg8hsjsu42g462v',
+    region: publicEnvironment.awsRegion,
+    userPoolId: publicEnvironment.cognitoUserPoolId,
+    userPoolClientId: publicEnvironment.cognitoUserPoolClientId,
 };
 
 Amplify.configure({

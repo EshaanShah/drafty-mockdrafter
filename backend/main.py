@@ -1,33 +1,27 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import logging
-from dotenv import load_dotenv
-import os
 
+from environment import load_settings
 from schemas import DraftRequest, DraftResponse
 from agent.draft_agent import generate_recommendation
-
-# --------------------
-# Env
-# --------------------
-load_dotenv()
-
-if not os.getenv("GROQ_API_KEY"):
-    logging.warning("GROQ_API_KEY is not set; draft recommendations will use deterministic fallback if Groq fails.")
 
 # --------------------
 # Logging
 # --------------------
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+settings = load_settings()
 
 # --------------------
 # App
 # --------------------
 app = FastAPI(
     title="Draft Assistant API",
-    version="1.0.0"
+    version="1.0.0",
 )
+
+logger.info("Starting Draft Assistant API in %s", settings.app_environment.value)
 
 app.add_middleware(
     CORSMiddleware,
