@@ -1,7 +1,5 @@
-from dotenv import load_dotenv
 import json
 import logging
-import os
 import re
 
 from langchain_groq import ChatGroq
@@ -9,10 +7,9 @@ from langchain_core.messages import SystemMessage, HumanMessage
 
 from agent.output_models import DraftAnalysis, FinalDraftRecommendationResponse, LLMRecommendationOutput
 from agent.prompt_builder import build_agent_policy_prompt, build_llm_input
+from environment import load_settings
 from engine.draft_analyzer import analyze_pick
 from schemas import DraftRequest
-
-load_dotenv()
 
 # --------------------
 # LLM
@@ -25,9 +22,10 @@ llm = None
 def _get_llm():
     global llm
     if llm is None:
+        settings = load_settings()
         llm = ChatGroq(
             model="llama-3.1-8b-instant",
-            api_key=os.getenv("GROQ_API_KEY"),
+            api_key=settings.groq_api_key,
         )
     return llm
 
