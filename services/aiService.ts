@@ -1,6 +1,5 @@
 import type { Player, Roster } from "@/contexts/RosterContext";
-
-const BACKEND_BASE_URL = process.env.EXPO_PUBLIC_BACKEND_URL || "http://localhost:8000";
+import { publicEnvironment } from "@/config/environment";
 
 export type PlayerAnalysisVerdict = "STEAL" | "GOOD VALUE" | "FAIR VALUE" | "REACH";
 
@@ -135,12 +134,12 @@ export const generatePlayerAnalysis = async (
         available_players: playerData.availablePlayers || [],
     };
 
-    const healthResponse = await fetch(`${BACKEND_BASE_URL}/health`, { signal });
+    const healthResponse = await fetch(`${publicEnvironment.backendUrl}/health`, { signal });
     if (!healthResponse.ok) {
-        throw new Error(`Backend health check failed at ${BACKEND_BASE_URL}/health`);
+        throw new Error(`Backend health check failed at ${publicEnvironment.backendUrl}/health`);
     }
 
-    const response = await fetch(`${BACKEND_BASE_URL}/draft/recommend`, {
+    const response = await fetch(`${publicEnvironment.backendUrl}/draft/recommend`, {
         method: "POST",
         headers: {
             "Content-Type": "application/json",

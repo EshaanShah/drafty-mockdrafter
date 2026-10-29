@@ -9,6 +9,7 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "lint": "expo lint",
+    "test:environment": "node --experimental-strip-types --test tests/public_environment.test.mjs",
     "typecheck": "tsc --noEmit",
     "export:ios": "expo export --platform ios",
     "export:android": "expo export --platform android",

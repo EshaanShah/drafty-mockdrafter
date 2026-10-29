@@ -59,8 +59,23 @@ The frontend uses Expo SDK 57 and Node 22.13.0, recorded in `.nvmrc`. Select tha
 ```sh
 nvm use
 npm install
+cp .env.example .env.local
 npm start
 ```
+
+Replace the example Cognito identifiers in `.env.local` with the public identifiers for the development user pool. When testing on a physical iPhone, use a backend URL reachable from the phone instead of `localhost`. The app validates its environment name, backend URL, AWS region, user pool ID, and app client ID before rendering; missing or malformed values fail with the variable name and setup guidance.
+
+EAS builds use the matching `development`, `preview`, or `production` environment selected by `eas.json`. Define these public variables in every EAS environment:
+
+```text
+EXPO_PUBLIC_APP_ENV
+EXPO_PUBLIC_BACKEND_URL
+EXPO_PUBLIC_AWS_REGION
+EXPO_PUBLIC_COGNITO_USER_POOL_ID
+EXPO_PUBLIC_COGNITO_USER_POOL_CLIENT_ID
+```
+
+Only public client configuration may use the `EXPO_PUBLIC_` prefix because Expo inlines those values into the app bundle. Provider keys, credentials, and other secrets must remain unprefixed and server-side. Preview and production backend URLs must use HTTPS.
 
 Compatibility decisions and migration notes for the current Expo baseline are recorded in [`docs/expo-sdk-57-upgrade.md`](docs/expo-sdk-57-upgrade.md).
 
@@ -70,6 +85,7 @@ The backend uses Python 3.13.7, recorded in `.python-version`. From a clean chec
 python3.13 -m venv .venv
 .venv/bin/python -m pip install --upgrade pip==25.2
 .venv/bin/python -m pip install --require-hashes -r backend/requirements-dev.txt
+cp backend/.env.example backend/.env
 ```
 
 Run the API from the repository root:
@@ -97,7 +113,7 @@ npm run export:web
 .venv/bin/pip-compile --generate-hashes --output-file=backend/requirements-dev.txt backend/requirements-dev.in
 ```
 
-Environment-specific values belong in ignored environment files. Never commit secrets or embed private keys in the mobile client.
+`APP_ENV` accepts `development`, `preview`, or `production`. `GROQ_API_KEY` is required when the API starts and remains in the server environment only. Environment-specific values belong in ignored environment files. Never commit secrets or embed private keys in the mobile client.
 
 ## Project status
 
